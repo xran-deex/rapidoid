@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+</head>
+<body>
+<h1>Hello World!</h1>
+<script>
+    var ws = new WebSocket("ws://localhost:8888/websocket");
+    ws.onmessage = function(msg) {
+        console.log(msg);
+    }
+    ws.onopen = function() {
+        ws.send("Hello, World");
+    }
+</script>
+</body>
+</html>
