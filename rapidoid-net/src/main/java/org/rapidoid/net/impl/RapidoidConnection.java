@@ -93,6 +93,8 @@ public class RapidoidConnection extends RapidoidThing implements Resetable, Chan
 
 	private volatile long expiresAt;
 
+	private boolean isWebSocket;
+
 	public RapidoidConnection(RapidoidWorker worker, BufGroup bufs) {
 		this.worker = worker;
 		this.input = bufs.newBuf("input#" + connId());
@@ -124,6 +126,7 @@ public class RapidoidConnection extends RapidoidThing implements Resetable, Chan
 		protocol = null;
 		requestId = 0;
 		expiresAt = 0;
+		isWebSocket = false;
 		state.reset();
 	}
 

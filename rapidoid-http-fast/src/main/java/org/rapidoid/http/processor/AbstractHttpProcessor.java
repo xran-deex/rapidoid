@@ -27,20 +27,23 @@ import org.rapidoid.http.FastHttpProtocol;
 import org.rapidoid.http.HttpMetadata;
 import org.rapidoid.net.Server;
 import org.rapidoid.net.TCP;
+import org.rapidoid.websocket.WebSocketProtocol;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
 public abstract class AbstractHttpProcessor extends RapidoidThing implements HttpProcessor, HttpMetadata {
 
 	protected final HttpProcessor next;
+	protected final WebSocketProtocol proto;
 
-	protected AbstractHttpProcessor(HttpProcessor next) {
+	protected AbstractHttpProcessor(HttpProcessor next, WebSocketProtocol proto) {
 		this.next = next;
+		this.proto = proto;
 	}
 
 	@Override
 	public Server listen(String address, int port) {
-		FastHttpProtocol protocol = new FastHttpProtocol(this);
+		FastHttpProtocol protocol = new FastHttpProtocol(this, proto);
 		return TCP.server().protocol(protocol).address(address).port(port).build().start();
 	}
 

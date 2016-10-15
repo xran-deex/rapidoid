@@ -108,6 +108,10 @@ public class HttpHandlers extends RapidoidThing {
 		routes.on(verb, path, new CallableHttpHandler(http, routes, options, (Callable<Object>) handler));
 	}
 
+	public static void register(FastHttp http, HttpRoutes routes, String verb, String path, HttpHandler handler) {
+		routes.on(verb, path, handler);
+	}
+
 	public static void register(FastHttp http, HttpRoutes routes, String verb, String path, RouteOptions options, NParamLambda lambda) {
 		HttpHandler handler = HttpHandlers.from(http, routes, lambda, options);
 		routes.on(verb, path, handler);
@@ -116,5 +120,4 @@ public class HttpHandlers extends RapidoidThing {
 	public static void register(FastHttp http, HttpRoutes routes, String verb, String path, RouteOptions options, Method method, Object instance) {
 		routes.on(verb, path, new MethodReqHandler(http, routes, options, method, instance));
 	}
-
 }

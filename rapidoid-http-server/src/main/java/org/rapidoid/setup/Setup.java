@@ -16,6 +16,7 @@ import org.rapidoid.http.ReqHandler;
 import org.rapidoid.http.ReqRespHandler;
 import org.rapidoid.http.customize.Customization;
 import org.rapidoid.http.handler.HttpHandler;
+import org.rapidoid.http.handler.HttpHandlers;
 import org.rapidoid.http.handler.optimized.DelegatingParamsAwareReqHandler;
 import org.rapidoid.http.handler.optimized.DelegatingParamsAwareReqRespHandler;
 import org.rapidoid.http.impl.HttpRoutesImpl;
@@ -26,6 +27,7 @@ import org.rapidoid.ioc.IoCContext;
 import org.rapidoid.job.Jobs;
 import org.rapidoid.jpa.JPAPersisterProvider;
 import org.rapidoid.lambda.NParamLambda;
+import org.rapidoid.lambda.OneParamLambda;
 import org.rapidoid.log.Log;
 import org.rapidoid.net.Server;
 import org.rapidoid.security.Role;
@@ -34,6 +36,7 @@ import org.rapidoid.util.AppInfo;
 import org.rapidoid.util.Constants;
 import org.rapidoid.util.Msc;
 import org.rapidoid.util.Once;
+import org.rapidoid.websocket.WebSocketProtocol;
 
 import java.util.List;
 import java.util.Map;
@@ -103,7 +106,7 @@ public class Setup extends RapidoidThing implements Constants {
 
 	private final Customization customization;
 	private final HttpRoutesImpl routes;
-	private volatile FastHttp http;
+	protected volatile FastHttp http;
 	private volatile RouteOptions defaults = new RouteOptions();
 
 	private volatile Integer port;
@@ -116,6 +119,8 @@ public class Setup extends RapidoidThing implements Constants {
 	private volatile boolean activated;
 	private volatile boolean reloaded;
 	private volatile boolean goodies = true;
+
+	protected volatile WebSocketProtocol wsProto;
 
 	private final Once bootstrapedComponents = new Once();
 
@@ -132,7 +137,7 @@ public class Setup extends RapidoidThing implements Constants {
 		instances.remove(this);
 	}
 
-	private Setup(String name, String segment, String defaultAddress, int defaultPort, IoCContext ioCContext, Config appConfig, Config serverConfig) {
+	protected Setup(String name, String segment, String defaultAddress, int defaultPort, IoCContext ioCContext, Config appConfig, Config serverConfig) {
 		this.name = name;
 		this.segment = segment;
 
@@ -165,14 +170,24 @@ public class Setup extends RapidoidThing implements Constants {
 
 			if (http == null) {
 				if (isAppOrAdminOnSameServer()) {
-					http = new FastHttp(ON.routes, ADMIN.routes);
+					http = new FastHttp(wsProto(), ON.routes, ADMIN.routes);
 				} else {
-					http = new FastHttp(routes);
+					http = new FastHttp(wsProto(), routes);
 				}
 			}
 		}
 
 		return http;
+	}
+
+	public WebSocketProtocol wsProto() {
+		if(wsProto != null) return wsProto;
+		synchronized (this) {
+			if(wsProto == null){
+				wsProto = new WebSocketProtocol();
+			}
+		}
+		return wsProto;
 	}
 
 	public synchronized Server listen() {
@@ -261,6 +276,11 @@ public class Setup extends RapidoidThing implements Constants {
 			AppInfo.isAdminServerActive = true;
 			AppInfo.adminPort = port();
 		}
+	}
+
+	public OnRoute websocket(String path){
+		activate();
+		return new OnRoute(http(), defaults, routes, GET, path, wsProto());
 	}
 
 	public OnRoute route(String verb, String path) {

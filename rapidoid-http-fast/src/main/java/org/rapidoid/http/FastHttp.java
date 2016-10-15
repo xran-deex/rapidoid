@@ -19,6 +19,8 @@ import org.rapidoid.net.abstracts.Channel;
 import org.rapidoid.net.impl.RapidoidHelper;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
+import org.rapidoid.websocket.WebSocketHandler;
+import org.rapidoid.websocket.WebSocketProtocol;
 
 import java.io.Serializable;
 import java.util.Collections;
@@ -56,13 +58,15 @@ public class FastHttp extends AbstractHttpProcessor {
 
 	private final Map<String, Object> attributes = Coll.synchronizedMap();
 	private final Map<String, Map<String, Serializable>> sessions = Coll.mapOfMaps();
+	private final WebSocketProtocol webSocketProtocol;
 
-	public FastHttp(HttpRoutesImpl... routes) {
-		super(null);
+	public FastHttp(WebSocketProtocol proto, HttpRoutesImpl... routes) {
+		super(null, proto);
 		U.must(routes.length > 0, "Routes are missing!");
 
 		this.routes = routes;
 		this.customization = routes[0].custom();
+		this.webSocketProtocol = proto;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -177,6 +181,13 @@ public class FastHttp extends AbstractHttpProcessor {
 			}
 
 			channel.setRequest(req);
+
+			// check for a websocket upgrade
+			if (headers.containsKey("upgrade") && handler instanceof WebSocketHandler) {
+				String websocketKey = headers.get("sec-websocket-key");
+				webSocketProtocol.acceptConnection(channel, websocketKey, (WebSocketHandler)handler, req);
+				return;
+			}
 		}
 
 		try {

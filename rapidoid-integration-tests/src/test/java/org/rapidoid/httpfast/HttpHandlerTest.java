@@ -40,7 +40,7 @@ public class HttpHandlerTest extends IntegrationTestCommons {
 	public void testFastHttpHandler() {
 		Customization customization = new Customization("example", new Config(), new Config());
 		HttpRoutesImpl routes = new HttpRoutesImpl(customization);
-		FastHttp http = new FastHttp(routes);
+		FastHttp http = new FastHttp(null, routes);
 
 		routes.on("get", "/abc", Req::data);
 

@@ -110,7 +110,6 @@ public class HttpRoutesImpl extends RapidoidThing implements HttpRoutes {
 					if (path1 == null) {
 						path1 = path.getBytes();
 						handler1 = handler;
-
 					} else if (path2 == null) {
 						path2 = path.getBytes();
 						handler2 = handler;

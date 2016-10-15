@@ -167,7 +167,7 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 	private long processMsgs(RapidoidConnection conn) {
 		long reqN = 0;
 
-		while (reqN < maxPipelineSize && conn.input().hasRemaining() && processNext(conn, false)) {
+		while (reqN < maxPipelineSize && (conn.output().hasRemaining() || conn.input().hasRemaining()) && processNext(conn, false)) {
 			reqN++;
 		}
 
@@ -184,12 +184,14 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 			conn.requestId = -1;
 		} else {
 			// conn.log("<< PROCESS >>");
-			U.must(conn.input().hasRemaining());
+			//U.must(conn.input().hasRemaining());
 
 			conn.requestId = helper.requestIdGen;
 			helper.requestIdGen += MAX_IO_WORKERS;
 			helper.requestCounter++;
 		}
+
+		if(conn.output().hasRemaining()) return true;
 
 		// prepare for a rollback in case the message isn't complete yet
 		conn.input().checkpoint(conn.input().position());
@@ -233,7 +235,7 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 
 			// Log.debug("Incomplete message");
 			conn.log("<< ROLLBACK >>");
-
+			System.out.println("Incomplete read");
 			// input not complete, so rollback
 			conn.input().position(conn.input().checkpoint());
 			conn.input().limit(limit);

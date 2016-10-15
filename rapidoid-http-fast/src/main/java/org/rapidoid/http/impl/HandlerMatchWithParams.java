@@ -49,5 +49,4 @@ public class HandlerMatchWithParams extends RapidoidThing implements HandlerMatc
 	public Map<String, String> getParams() {
 		return params;
 	}
-
 }

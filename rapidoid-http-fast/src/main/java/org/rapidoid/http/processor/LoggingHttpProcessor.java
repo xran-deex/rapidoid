@@ -33,7 +33,7 @@ import org.rapidoid.net.abstracts.Channel;
 public class LoggingHttpProcessor extends AbstractHttpProcessor {
 
 	public LoggingHttpProcessor(HttpProcessor next) {
-		super(next);
+		super(next, null);
 	}
 
 	@Override

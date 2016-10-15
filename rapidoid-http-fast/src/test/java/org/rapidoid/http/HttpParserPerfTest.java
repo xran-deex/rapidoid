@@ -55,6 +55,7 @@ public class HttpParserPerfTest {
 
 		final BoolWrap isGet = helper.booleans[0];
 		final BoolWrap isKeepAlive = helper.booleans[1];
+		final BoolWrap isWebSocket = helper.booleans[2];
 
 		final BufRange verb = ranges[ranges.length - 1];
 		final BufRange uri = ranges[ranges.length - 2];

@@ -11,7 +11,10 @@ import org.rapidoid.http.processor.HttpProcessor;
 import org.rapidoid.net.Protocol;
 import org.rapidoid.net.abstracts.Channel;
 import org.rapidoid.net.impl.RapidoidHelper;
+import org.rapidoid.websocket.WebSocketProtocol;
 import org.rapidoid.wrap.BoolWrap;
+
+import static org.rapidoid.websocket.WebSocketStatusCode.*;
 
 /*
  * #%L
@@ -40,9 +43,11 @@ public class FastHttpProtocol extends RapidoidThing implements Protocol {
 	private static final HttpParser HTTP_PARSER = new HttpParser();
 
 	private final HttpProcessor processor;
+	private final WebSocketProtocol webSocketProtocol;
 
-	public FastHttpProtocol(HttpProcessor processor) {
+	public FastHttpProtocol(HttpProcessor processor, WebSocketProtocol proto) {
 		this.processor = processor;
+		this.webSocketProtocol = proto;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -67,9 +72,9 @@ public class FastHttpProtocol extends RapidoidThing implements Protocol {
 		BufRange protocol = ranges[ranges.length - 5];
 		BufRange body = ranges[ranges.length - 6];
 
-		HTTP_PARSER.parse(buf, isGet, isKeepAlive, body, verb, uri, path, query, protocol, headers, helper);
-
-		processor.onRequest(channel, isGet.value, isKeepAlive.value, body, verb, uri, path, query, protocol, headers);
+		if(!webSocketProtocol.CheckForWebSocket(buf, channel)) {
+			HTTP_PARSER.parse(buf, isGet, isKeepAlive, body, verb, uri, path, query, protocol, headers, helper);
+			processor.onRequest(channel, isGet.value, isKeepAlive.value, body, verb, uri, path, query, protocol, headers);
+		}
 	}
-
 }

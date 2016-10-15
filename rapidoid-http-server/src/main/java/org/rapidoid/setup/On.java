@@ -37,6 +37,8 @@ public class On extends RapidoidThing {
 
 	private static final Setup SETUP = Setup.ON;
 
+	public static synchronized OnRoute websocket(String path) { return SETUP.websocket(path); }
+
 	public static synchronized OnRoute route(String verb, String path) {
 		return SETUP.route(verb, path);
 	}

@@ -33,7 +33,7 @@ import org.rapidoid.net.abstracts.Channel;
 public class AppRestartProcessor extends AbstractHttpProcessor {
 
 	public AppRestartProcessor(Setup setup, HttpProcessor next) {
-		super(next);
+		super(next, null);
 	}
 
 	@Override

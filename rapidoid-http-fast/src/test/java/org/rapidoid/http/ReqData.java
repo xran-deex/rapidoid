@@ -47,5 +47,6 @@ public class ReqData {
 
 	final BoolWrap isGet = new BoolWrap();
 	final BoolWrap isKeepAlive = new BoolWrap();
+	final BoolWrap isWebSocket = new BoolWrap();
 
 }

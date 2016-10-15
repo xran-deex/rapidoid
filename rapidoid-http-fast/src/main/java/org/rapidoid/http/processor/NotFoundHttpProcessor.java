@@ -32,7 +32,7 @@ import org.rapidoid.net.abstracts.Channel;
 public class NotFoundHttpProcessor extends AbstractHttpProcessor {
 
 	public NotFoundHttpProcessor() {
-		super(null);
+		super(null, null);
 	}
 
 	@Override

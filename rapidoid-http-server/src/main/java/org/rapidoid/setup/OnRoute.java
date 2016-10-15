@@ -6,7 +6,9 @@ import org.rapidoid.annotation.Since;
 import org.rapidoid.annotation.TransactionMode;
 import org.rapidoid.commons.MediaType;
 import org.rapidoid.http.*;
+import org.rapidoid.http.handler.HttpHandler;
 import org.rapidoid.http.handler.HttpHandlers;
+import org.rapidoid.websocket.*;
 import org.rapidoid.http.impl.RouteOptions;
 import org.rapidoid.lambda.*;
 
@@ -49,12 +51,24 @@ public class OnRoute extends RapidoidThing {
 
 	private final RouteOptions options;
 
+	private final WebSocketProtocol wsProto;
+
 	public OnRoute(FastHttp http, RouteOptions defaults, HttpRoutes routes, String verb, String path) {
 		this.http = http;
 		this.routes = routes;
 		this.verb = verb;
 		this.path = path;
 		this.options = defaults.copy();
+		this.wsProto = null;
+	}
+
+	public OnRoute(FastHttp http, RouteOptions defaults, HttpRoutes routes, String verb, String path, WebSocketProtocol wsProto) {
+		this.http = http;
+		this.routes = routes;
+		this.verb = verb;
+		this.path = path;
+		this.options = defaults.copy();
+		this.wsProto = wsProto;
 	}
 
 	/* GENERIC */
@@ -397,4 +411,13 @@ public class OnRoute extends RapidoidThing {
 		return this;
 	}
 
+	public void ws(IWebSocketRequest req){
+		WebSocketHandler handler = new WebSocketHandler(wsProto, req, htmlOpts());
+		HttpHandlers.register(http, routes, verb, path, handler);
+	}
+
+	public OnRoute ws_init(IWebSocketInit webSocketInit){
+		webSocketInit.init(wsProto);
+		return this;
+	}
 }
