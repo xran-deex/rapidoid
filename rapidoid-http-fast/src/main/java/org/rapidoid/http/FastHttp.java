@@ -200,12 +200,6 @@ public class FastHttp extends AbstractHttpProcessor {
 
 			channel.setRequest(req);
 
-			// check for a websocket upgrade
-			if (headers.containsKey("upgrade") && handler instanceof WebSocketHandler) {
-				String websocketKey = headers.get("sec-websocket-key");
-				webSocketProtocol.acceptConnection(channel, websocketKey, (WebSocketHandler)handler, req);
-				return req;
-			}
 		} else {
 			posted = Collections.EMPTY_MAP;
 			files = Collections.EMPTY_MAP;
@@ -239,6 +233,12 @@ public class FastHttp extends AbstractHttpProcessor {
 		}
 
 		channel.setRequest(req);
+		// check for a websocket upgrade
+		if (headers.containsKey("upgrade") && handler instanceof WebSocketHandler) {
+			String websocketKey = headers.get("sec-websocket-key");
+			webSocketProtocol.acceptConnection(channel, websocketKey, (WebSocketHandler)handler, req);
+			return req;
+		}
 		return req;
 	}
 

@@ -7,4 +7,5 @@ import java.util.List;
  */
 public interface IWebSocketProtocol {
     List<IWebSocketConnection> conns();
+    void addExtension(IWebSocketExtension extension);
 }
