@@ -3,6 +3,7 @@ package com.example;
 import org.rapidoid.annotation.Run;
 import org.rapidoid.annotation.Valid;
 import org.rapidoid.jpa.JPA;
+import org.rapidoid.log.Log;
 import org.rapidoid.setup.App;
 import org.rapidoid.setup.My;
 import org.rapidoid.setup.On;
@@ -12,6 +13,8 @@ import org.rapidoid.u.U;
 public class Main {
 
 	public static void main(String[] args) {
+		Log.info("Starting application");
+
 		App.bootstrap(args).jpa().auth(); // bootstrap controllers, JPA and Auth
 
 		On.get("/books").json(() -> JPA.of(Book.class).all()); // get all books
@@ -26,10 +29,10 @@ public class Main {
 		});
 
 		// Dummy login: successful if the username is the same as the password
-		My.loginProvider((username, password) -> username.equals(password));
+		My.loginProvider((req, username, password) -> username.equals(password));
 
 		// Gives the 'manager' role to every logged-in user
-		My.rolesProvider(username -> U.set("manager"));
+		My.rolesProvider((req, username) -> U.set("manager"));
 	}
 
 }

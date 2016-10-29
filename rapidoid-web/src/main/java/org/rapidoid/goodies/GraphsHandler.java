@@ -2,7 +2,7 @@ package org.rapidoid.goodies;
 
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.TimeSeries;
+import org.rapidoid.timeseries.TimeSeries;
 import org.rapidoid.gui.GUI;
 import org.rapidoid.html.Tag;
 import org.rapidoid.insight.Metrics;
@@ -38,10 +38,10 @@ public class GraphsHandler extends GUI implements Callable<Object> {
 
 	@Override
 	public Object call() throws Exception {
-		return graphs(2);
+		return multi(graphs(2));
 	}
 
-	public static Object graphs(int perRow) {
+	public static List<Tag> graphs(int perRow) {
 		List<Tag> rows = U.list();
 		Map<String, TimeSeries> metrics = Metrics.all();
 

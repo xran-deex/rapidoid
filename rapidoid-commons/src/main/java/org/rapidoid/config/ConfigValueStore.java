@@ -39,6 +39,7 @@ public class ConfigValueStore<T> extends RapidoidThing implements ValueStore<T> 
 		this.key = key;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public T get() {
 		return (T) config.get(key);

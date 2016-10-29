@@ -3,15 +3,17 @@ package org.rapidoid.render;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.beany.Beany;
-import org.rapidoid.beany.Prop;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.commons.Str;
+import org.rapidoid.render.retriever.GenericValueRetriever;
+import org.rapidoid.render.retriever.ValueRetriever;
 import org.rapidoid.u.U;
+import org.rapidoid.util.StreamUtils;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -39,62 +41,83 @@ import java.util.Map;
 @Since("5.1.0")
 public class RenderCtxImpl extends RapidoidThing implements RenderCtx {
 
-	private final OutputStream out;
-	private final String ext;
-	private final List<Object> model;
+	private final List<Object> model = U.list();
 
-	public RenderCtxImpl(OutputStream out, String filename, Object... model) {
-		this.out = out;
-		this.model = U.list(model);
+	private volatile OutputStream out;
+	private volatile String ext;
+	private volatile TemplateFactory factory;
 
-		String fileExt = Str.cutFromFirst(filename, ".");
-		this.ext = fileExt != null ? "." + fileExt : "";
+	@Override
+	public void printAscii(String s) throws IOException {
+		StreamUtils.writeAscii(out, s);
 	}
 
 	@Override
-	public void print(String s) {
-		try {
-			out.write(s.getBytes());
-		} catch (IOException e) {
-			throw U.rte(e);
+	public void printUTF8(String s) throws IOException {
+		StreamUtils.writeUTF8(out, s);
+	}
+
+	@Override
+	public void printValue(Object value, boolean escape) throws IOException {
+		if (!escape) {
+			printUTF8(U.str(value));
+			return;
 		}
+
+		if (value instanceof String) {
+			String s = (String) value;
+			StreamUtils.writeUTF8HtmlEscaped(out, s);
+			return;
+		}
+
+		if (value instanceof Number) {
+
+			if (value instanceof Integer || value instanceof Long || value instanceof Short || value instanceof Byte) {
+				long n = ((Number) value).longValue();
+				StreamUtils.putNumAsText(out, n);
+				return;
+			}
+
+			printAscii(value.toString());
+			return;
+		}
+
+		if (value == null) {
+			printAscii("null");
+			return;
+		}
+
+		StreamUtils.writeUTF8HtmlEscaped(out, U.str(value));
 	}
 
 	@Override
-	public Object[] iter(String name) {
-		Object val = get(name);
+	public List iter(ValueRetriever retriever) {
+		Object val = retriever.retrieve(model);
 
-		if (val instanceof Collection<?>) {
-			return ((Collection<?>) val).toArray();
+		if (val instanceof List<?>) {
+			return ((List) val);
 
 		} else if (val instanceof Object[]) {
-			return (Object[]) val;
+			return U.list((Object[]) val);
+
+		} else if (val instanceof Iterable<?>) {
+			return U.list((Iterable<?>) val);
 
 		} else {
-			return val != null && !Boolean.FALSE.equals(val) ? U.array(val) : U.array();
+			return val != null && !Boolean.FALSE.equals(val) ? U.list(val) : Collections.emptyList();
 		}
 	}
 
 	@Override
-	public void val(String name, boolean escape) {
-		valOr(name, "N/A", escape);
+	public void val(ValueRetriever retriever, boolean escape) throws IOException {
+		valOr(retriever, "N/A", escape);
 	}
 
 	@Override
-	public void valOr(String name, String or, boolean escape) {
-		Object val = name.equals(".") ? self() : get(name);
+	public void valOr(ValueRetriever retriever, String or, boolean escape) throws IOException {
+		Object val = retriever.retrieve(model);
 		val = U.or(val, or);
-		print(str(escape, val));
-	}
-
-	private String str(boolean escape, Object val) {
-		String str = U.str(val);
-		if (escape) str = Str.htmlEscape(str);
-		return str;
-	}
-
-	private Object self() {
-		return !model.isEmpty() ? model.get(model.size() - 1) : null;
+		printValue(val, escape);
 	}
 
 	@Override
@@ -112,7 +135,8 @@ public class RenderCtxImpl extends RapidoidThing implements RenderCtx {
 
 	@Override
 	public void call(String name) {
-		Templates.fromFile(name + ext).renderTo(out, model.toArray());
+		RapidoidTemplate template = (RapidoidTemplate) factory.load(name + ext);
+		template.renderInContext(this);
 	}
 
 	@Override
@@ -120,49 +144,52 @@ public class RenderCtxImpl extends RapidoidThing implements RenderCtx {
 		Object val = get(name);
 
 		return val != null
-				&& !Boolean.FALSE.equals(val)
-				&& (!Coll.isCollection(val) || !U.isEmpty((Collection<?>) val))
-				&& (!Coll.isMap(val) || !U.isEmpty((Map<?, ?>) val));
+			&& !Boolean.FALSE.equals(val)
+			&& (!Coll.isCollection(val) || !U.isEmpty((Collection<?>) val))
+			&& (!Coll.isMap(val) || !U.isEmpty((Map<?, ?>) val));
 	}
 
 	private Object get(String name) {
-		return propOf(name, model.toArray());
+		return GenericValueRetriever.propOf(name, model);
 	}
 
-	private static Object propOf(String name, Object[] scope) {
-		int p = name.indexOf(".");
+	public RenderCtxImpl out(OutputStream out) {
+		this.out = out;
+		return this;
+	}
 
-		if (p > 0) {
-			Object first = propOf(name.substring(0, p), scope);
-			return propOf(name.substring(p + 1), new Object[]{first});
+	public RenderCtxImpl multiModel(List<Object> model) {
+		Coll.assign(this.model, model);
+		return this;
+	}
+
+	public RenderCtxImpl model(Object model) {
+		this.model.clear();
+		this.model.add(model);
+		return this;
+	}
+
+	public RenderCtxImpl factory(TemplateFactory factory) {
+		this.factory = factory;
+		return this;
+	}
+
+	private String calcFileExt(String filename) {
+		if (U.notEmpty(filename)) {
+			String fileExt = Str.cutFromFirst(filename, ".");
+			return fileExt != null ? "." + fileExt : "";
+		} else {
+			return "";
 		}
+	}
 
-		for (int i = scope.length - 1; i >= 0; i--) {
-			Object x = scope[i];
-			if (x != null) {
-				if (x instanceof Map<?, ?>) {
-					Map<?, ?> map = (Map<?, ?>) x;
+	public RenderCtxImpl filename(String filename) {
+		this.ext = calcFileExt(filename);
+		return this;
+	}
 
-					if (map.containsKey(name)) {
-						return map.get(name);
-					}
-
-				} else if (x instanceof Getter) {
-					Getter getter = (Getter) x;
-
-					return getter.get(name);
-
-				} else {
-					Prop prop = Beany.property(x, name, false);
-
-					if (prop != null) {
-						return prop.get(x);
-					}
-				}
-			}
-		}
-
-		return null;
+	public void reset() {
+		this.model.clear();
 	}
 
 }

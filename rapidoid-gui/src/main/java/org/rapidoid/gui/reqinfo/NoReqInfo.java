@@ -111,13 +111,13 @@ public class NoReqInfo extends AbstractReqInfo {
 	}
 
 	@Override
-	public String segment() {
+	public String zone() {
 		return "main";
 	}
 
 	@Override
 	public String contextPath() {
-		return "/";
+		return "";
 	}
 
 	@Override

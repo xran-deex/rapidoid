@@ -80,8 +80,8 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 
 		if (code != null && !U.isEmpty(state)) {
 
-			String id = clientId.or(OAuth.NO_ID);
-			String secret = clientSecret.or(OAuth.NO_SECRET);
+			String id = clientId.str().get();
+			String secret = clientSecret.str().get();
 
 			char statePrefix = state.charAt(0);
 			U.must(statePrefix == 'P' || statePrefix == 'N', "Invalid OAuth state prefix!");
@@ -96,8 +96,8 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 			String redirectUrl = U.notEmpty(domain) ? domain + callbackPath : HttpUtils.constructUrl(req, callbackPath);
 
 			TokenRequestBuilder reqBuilder = OAuthClientRequest.tokenLocation(provider.getTokenEndpoint())
-					.setGrantType(GrantType.AUTHORIZATION_CODE).setClientId(id).setClientSecret(secret)
-					.setRedirectURI(redirectUrl).setCode(code);
+				.setGrantType(GrantType.AUTHORIZATION_CODE).setClientId(id).setClientSecret(secret)
+				.setRedirectURI(redirectUrl).setCode(code);
 
 			OAuthClientRequest request = paramsInBody() ? reqBuilder.buildBodyMessage() : reqBuilder.buildBodyMessage();
 
@@ -108,10 +108,10 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 			String profileUrl = Msc.fillIn(provider.getProfileEndpoint(), "token", accessToken);
 
 			OAuthClientRequest bearerClientRequest = new OAuthBearerClientRequest(profileUrl).setAccessToken(
-					accessToken).buildQueryMessage();
+				accessToken).buildQueryMessage();
 
 			OAuthResourceResponse res = oAuthClient.resource(bearerClientRequest,
-					org.apache.oltu.oauth2.common.OAuth.HttpMethod.GET, OAuthResourceResponse.class);
+				org.apache.oltu.oauth2.common.OAuth.HttpMethod.GET, OAuthResourceResponse.class);
 
 			U.must(res.getResponseCode() == 200, "OAuth response error!");
 
@@ -123,7 +123,7 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 			String name = U.or((String) auth.get("name"), firstName + " " + lastName);
 
 			String username = email;
-			Set<String> roles = customization.rolesProvider().getRolesForUser(username);
+			Set<String> roles = customization.rolesProvider().getRolesForUser(req, username);
 
 			UserInfo user = new UserInfo(username, roles);
 			user.name = name;
@@ -131,9 +131,9 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 			user.oauthProvider = provider.getName();
 			user.oauthId = String.valueOf(auth.get("id"));
 
-			Ctxs.ctx().setUser(user);
+			Ctxs.required().setUser(user);
 
-			// user.saveTo(x.cookiepack()); // FIXME use cookiepack
+			// user.saveTo(x.token()); // FIXME use token
 
 			return req.response().redirect("/"); // FIXME use page stack
 		} else {
@@ -156,7 +156,7 @@ public class OAuthTokenHandler extends RapidoidThing implements ReqHandler {
 		} else {
 			// JSON encoded
 			OAuthJSONAccessTokenResponse oAuthResponse = oAuthClient.accessToken(request,
-					OAuthJSONAccessTokenResponse.class);
+				OAuthJSONAccessTokenResponse.class);
 			return oAuthResponse.getAccessToken();
 		}
 	}

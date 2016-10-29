@@ -1,8 +1,9 @@
 package org.rapidoid.websocket;
 
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.http.MediaType;
 import org.rapidoid.http.HttpStatus;
 import org.rapidoid.http.Req;
+import org.rapidoid.http.Route;
 import org.rapidoid.http.handler.HttpHandler;
 import org.rapidoid.http.impl.RouteOptions;
 import org.rapidoid.lambda.TwoParamLambda;
@@ -19,6 +20,7 @@ public class WebSocketHandler implements HttpHandler {
     IWebSocketRequest req;
     RouteOptions options;
     IWebSocketProtocol proto;
+    Route route;
     public WebSocketHandler(IWebSocketProtocol proto, IWebSocketRequest req, RouteOptions opt) {
         this.req = req;
         this.options = opt;
@@ -46,6 +48,11 @@ public class WebSocketHandler implements HttpHandler {
     }
 
     @Override
+    public void setRoute(Route route) {
+        this.route = route;
+    }
+
+    @Override
     public HttpHandler getHandler() {
         return this;
     }
@@ -53,6 +60,11 @@ public class WebSocketHandler implements HttpHandler {
     @Override
     public Map<String, String> getParams() {
         return null;
+    }
+
+    @Override
+    public Route getRoute() {
+        return route;
     }
 
     public void setOptions(RouteOptions opts){

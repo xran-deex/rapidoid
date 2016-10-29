@@ -3,7 +3,7 @@ package org.rapidoid.ctx;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.log.Log;
 
 import java.util.*;
@@ -85,7 +85,7 @@ public class Ctx extends RapidoidThing implements CtxMetadata {
 		Object persister = this.persisters.get();
 
 		if (persister == null) {
-			persister = Ctxs.createPersister();
+			persister = Ctxs.createPersister(this);
 			this.persisters.set(persister);
 			persistersToClose.add(persister);
 		}
@@ -130,7 +130,7 @@ public class Ctx extends RapidoidThing implements CtxMetadata {
 		this.persisters = null;
 
 		for (Object persister : persistersToClose) {
-			Ctxs.closePersister(persister);
+			Ctxs.closePersister(this, persister);
 		}
 
 		persistersToClose.clear();
@@ -149,9 +149,9 @@ public class Ctx extends RapidoidThing implements CtxMetadata {
 	public String toString() {
 		final int maxLen = 10;
 		return prefixed("Ctx [id=" + id + ", tag=" + tag + ", user=" + user + ", exchange=" + exchange
-				+ ", referenceCounter=" + referenceCounter + ", closed=" + closed
-				+ ", persistersToClose=" + toString(persistersToClose, maxLen) + ", extras="
-				+ toString(extras.entrySet(), maxLen) + "]");
+			+ ", referenceCounter=" + referenceCounter + ", closed=" + closed
+			+ ", persistersToClose=" + toString(persistersToClose, maxLen) + ", extras="
+			+ toString(extras.entrySet(), maxLen) + "]");
 	}
 
 	private String prefixed(String asStr) {

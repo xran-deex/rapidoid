@@ -1,7 +1,6 @@
 package org.rapidoid.http;
 
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.web.Screen;
 
 import java.io.File;
@@ -133,6 +132,11 @@ public interface Resp {
 	String view();
 
 	/**
+	 * Disables the view rendering for the target MVC route. The page decorator remains enabled.
+	 */
+	Resp noView();
+
+	/**
 	 * Sets the <b>file</b> to be served when the HTTP response is rendered.
 	 */
 	Resp file(File file);
@@ -163,7 +167,7 @@ public interface Resp {
 	Resp cookie(String name, String value, String... extras);
 
 	/**
-	 * Provides <b>read/write access</b> to the <b>server-side session attributes</b> of the HTTP request.
+	 * Provides <b>read/write access</b> to the <b>server-side session attributes</b> of the HTTP request/response.
 	 */
 	Map<String, Serializable> session();
 
@@ -173,14 +177,14 @@ public interface Resp {
 	Resp session(String name, Serializable value);
 
 	/**
-	 * Provides <b>read/write access</b> to the <b>cookie-persisted session attributes</b> of the HTTP request.
+	 * Provides <b>read/write access</b> to the <b>token attributes</b> of the HTTP request/response.
 	 */
-	Map<String, Serializable> cookiepack();
+	Map<String, Serializable> token();
 
 	/**
-	 * Sets a <b>cookiepack attribute</b> of the HTTP response.
+	 * Sets a <b>token attribute</b> of the HTTP response.
 	 */
-	Resp cookiepack(String name, Serializable value);
+	Resp token(String name, Serializable value);
 
 	/**
 	 * Provides <b>read/write access</b> to the <b>model</b> (M from MVC) that will be rendered by the view renderer.
@@ -213,7 +217,7 @@ public interface Resp {
 	/**
 	 * Sets the <b><code>Content-Type: application/json; charset=utf-8</code> header and the content</b> of the HTTP
 	 * response. <br>
-	 * <i>Alias</i> to <code>contentType(MediaType.JSON_UTF_8).body(content)</code>.
+	 * <i>Alias</i> to <code>contentType(MediaType.JSON).body(content)</code>.
 	 */
 	Resp json(Object content);
 
@@ -226,14 +230,14 @@ public interface Resp {
 	/**
 	 * Checks whether the response model and view will be rendered in a MVC fashion.<br>
 	 * A typical renderer would use <code>Resp#view</code> to get the view name, and <code>Resp#model</code> to get the model.
-	 * A custom view renderer can be configured/implemented via the <code>On.custom().viewRenderer(...)</code> method.<br>
+	 * A custom view renderer can be configured/implemented via the <code>On.custom().viewResolver(...)</code> method.<br>
 	 */
 	boolean mvc();
 
 	/**
 	 * Sets whether the response model and view will be rendered in a MVC fashion.<br>
 	 * A typical renderer would use <code>Resp#view</code> to get the view name, and <code>Resp#model</code> to get the model.
-	 * A custom view renderer can be configured/implemented via the <code>On.custom().viewRenderer(...)</code> method.<br>
+	 * A custom view renderer can be configured/implemented via the <code>On.custom().viewResolver(...)</code> method.<br>
 	 */
 	Resp mvc(boolean mvc);
 
@@ -250,13 +254,13 @@ public interface Resp {
 
 	/**
 	 * Initiates a user login process with the specified <b>username</b> and <b>password</b>.<br>
-	 * After a successful login, the username will be persisted in the cookie-pack.<br>
+	 * After a successful login, the username will be persisted in the token.<br>
 	 * Returns information whether the login was successful
 	 */
 	boolean login(String username, String password);
 
 	/**
-	 * Initiates a user logout process, clearing the login information (username) from the cookie-pack.
+	 * Initiates a user logout process, clearing the login information (username) from the token.
 	 */
 	void logout();
 

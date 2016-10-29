@@ -6,11 +6,10 @@ import org.rapidoid.annotation.Since;
 import org.rapidoid.buffer.Buf;
 import org.rapidoid.bytes.Bytes;
 import org.rapidoid.bytes.BytesUtil;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.commons.Err;
 import org.rapidoid.data.BufRange;
 import org.rapidoid.data.BufRanges;
-import org.rapidoid.data.JSON;
 import org.rapidoid.data.KeyValueRanges;
 import org.rapidoid.http.HttpContentType;
 import org.rapidoid.io.Upload;
@@ -18,7 +17,6 @@ import org.rapidoid.log.Log;
 import org.rapidoid.net.impl.RapidoidHelper;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Constants;
-import org.rapidoid.wrap.BoolWrap;
 import org.rapidoid.wrap.IntWrap;
 
 import java.util.List;
@@ -92,13 +90,15 @@ public class HttpParser extends RapidoidThing implements Constants {
 
 	private static final byte[] GET = "GET".getBytes();
 
-	public void parse(Buf buf, BoolWrap isGet, BoolWrap isKeepAlive, BufRange body, BufRange verb, BufRange uri, BufRange path,
-	                  BufRange query, BufRange protocol, BufRanges headers, RapidoidHelper helper) {
+	public void parse(Buf buf, RapidoidHelper helper) {
 
 		Bytes bytes = buf.bytes();
 
-		buf.scanUntil(SPACE, verb);
-		buf.scanUntil(SPACE, uri);
+		BufRange protocol = helper.protocol;
+		BufRanges headers = helper.headers;
+
+		buf.scanUntil(SPACE, helper.verb);
+		buf.scanUntil(SPACE, helper.uri);
 		buf.scanLn(protocol);
 
 		boolean keepAliveByDefault = protocol.isEmpty() || bytes.get(protocol.last()) != '0'; // e.g. HTTP/1.1
@@ -107,19 +107,19 @@ public class HttpParser extends RapidoidThing implements Constants {
 		if (keepAliveByDefault) {
 			buf.scanLnLn(headers.reset(), result, (byte) 's', (byte) 'e'); // clo[se]
 			int possibleCloseHeaderPos = result.value;
-			isKeepAlive.value = possibleCloseHeaderPos < 0 || isConnectionHeader(bytes, headers, helper, possibleCloseHeaderPos);
+			helper.isKeepAlive.value = possibleCloseHeaderPos < 0 || isConnectionHeader(bytes, headers, helper, possibleCloseHeaderPos);
 
 		} else {
 			buf.scanLnLn(headers.reset(), result, (byte) 'v', (byte) 'e'); // keep-ali[ve]
 			int possibleKeepAliveHeaderPos = result.value;
-			isKeepAlive.value = possibleKeepAliveHeaderPos >= 0 && isConnectionHeader(bytes, headers, helper, possibleKeepAliveHeaderPos);
+			helper.isKeepAlive.value = possibleKeepAliveHeaderPos >= 0 && isConnectionHeader(bytes, headers, helper, possibleKeepAliveHeaderPos);
 		}
 
-		BytesUtil.split(bytes, uri, ASTERISK, path, query, false);
+		BytesUtil.split(bytes, helper.uri, ASTERISK, helper.path, helper.query, false);
 
-		isGet.value = BytesUtil.matches(bytes, verb, GET, true);
-		if (!isGet.value) {
-			parseBody(buf, body, headers, helper);
+		helper.isGet.value = BytesUtil.matches(bytes, helper.verb, GET, true);
+		if (!helper.isGet.value) {
+			parseBody(buf, helper);
 		}
 	}
 
@@ -146,7 +146,10 @@ public class HttpParser extends RapidoidThing implements Constants {
 		return BytesUtil.matches(bytes, connVal, KEEP_ALIVE, false);
 	}
 
-	private void parseBody(Buf buf, BufRange body, BufRanges headers, RapidoidHelper helper) {
+	private void parseBody(Buf buf, RapidoidHelper helper) {
+		BufRanges headers = helper.headers;
+		BufRange body = helper.body;
+
 		BufRange clen = headers.getByPrefix(buf.bytes(), CONTENT_LENGTH, false);
 
 		if (clen != null) {
@@ -328,7 +331,7 @@ public class HttpParser extends RapidoidThing implements Constants {
 	private void parseMultiPart(Buf src, BufRange body, KeyValueRanges data, Map<String, List<Upload>> files,
 	                            BufRange multipartBoundary, RapidoidHelper helper, int from, int to) {
 
-		KeyValueRanges headers = helper.pairs.reset();
+		KeyValueRanges headers = helper.headersKV.reset();
 		BufRange partBody = helper.ranges4.ranges[0];
 		BufRange contType = helper.ranges4.ranges[1];
 		BufRange contEnc = helper.ranges4.ranges[2];
@@ -377,9 +380,9 @@ public class HttpParser extends RapidoidThing implements Constants {
 				BytesUtil.trim(src.bytes(), charset);
 
 				if (!BytesUtil.matches(src.bytes(), charset, _UTF_8, false)
-						&& !BytesUtil.matches(src.bytes(), charset, _ISO_8859_1, false)) {
+					&& !BytesUtil.matches(src.bytes(), charset, _ISO_8859_1, false)) {
 					Log.warn("Tipically the UTF-8 and ISO-8859-1 charsets are expected, but received different!",
-							"charset", src.get(charset));
+						"charset", src.get(charset));
 				}
 			}
 		}
@@ -389,8 +392,8 @@ public class HttpParser extends RapidoidThing implements Constants {
 
 		if (encoding != null) {
 			boolean validEncoding = BytesUtil.matches(src.bytes(), encoding, _7BIT, false)
-					|| BytesUtil.matches(src.bytes(), encoding, _8BIT, false)
-					|| BytesUtil.matches(src.bytes(), encoding, BINARY, false);
+				|| BytesUtil.matches(src.bytes(), encoding, _8BIT, false)
+				|| BytesUtil.matches(src.bytes(), encoding, BINARY, false);
 			Err.rteIf(!validEncoding, "Invalid Content-transfer-encoding header value!");
 		}
 
@@ -446,13 +449,13 @@ public class HttpParser extends RapidoidThing implements Constants {
 
 			if (BytesUtil.startsWith(buf.bytes(), contType, CT_MULTIPART_FORM_DATA_BOUNDARY1, false)) {
 				multipartBoundary.setInterval(contType.start + CT_MULTIPART_FORM_DATA_BOUNDARY1.length,
-						contType.limit());
+					contType.limit());
 				return HttpContentType.MULTIPART;
 			}
 
 			if (BytesUtil.startsWith(buf.bytes(), contType, CT_MULTIPART_FORM_DATA_BOUNDARY2, false)) {
 				multipartBoundary.setInterval(contType.start + CT_MULTIPART_FORM_DATA_BOUNDARY2.length,
-						contType.limit());
+					contType.limit());
 				return HttpContentType.MULTIPART;
 			}
 
@@ -468,23 +471,14 @@ public class HttpParser extends RapidoidThing implements Constants {
 	}
 
 	@SuppressWarnings("unchecked")
-	public void parsePosted(Buf input, KeyValueRanges headersKV, BufRange rBody, KeyValueRanges posted,
-	                        Map<String, List<Upload>> files, RapidoidHelper helper, Map<String, Object> dest) {
+	public boolean parsePosted(Buf input, KeyValueRanges headersKV, BufRange rBody, KeyValueRanges posted,
+	                           Map<String, List<Upload>> files, RapidoidHelper helper, Map<String, Object> dest) {
 
 		boolean completed = parseBody(input, headersKV, rBody, posted, files, helper);
 
 		posted.toUrlEncodedParams(input, dest);
 
-		if (!completed && !rBody.isEmpty()) {
-			try {
-				Map<String, Object> jsonData = JSON.parse(input.get(rBody), Map.class);
-				if (jsonData != null) {
-					dest.putAll(jsonData);
-				}
-			} catch (Exception e) {
-				Log.warn("The attempt to parse the request body as JSON failed. Please specify the correct content type in the request header!", e);
-			}
-		}
+		return completed;
 	}
 
 }

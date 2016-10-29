@@ -1,9 +1,9 @@
 package org.rapidoid.setup;
 
-import org.rapidoid.RapidoidThing;
+import org.rapidoid.AuthBootstrap;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.commons.Env;
 import org.rapidoid.config.Conf;
 import org.rapidoid.config.Config;
@@ -25,7 +25,6 @@ import org.rapidoid.http.processor.HttpProcessor;
 import org.rapidoid.ioc.IoC;
 import org.rapidoid.ioc.IoCContext;
 import org.rapidoid.job.Jobs;
-import org.rapidoid.jpa.JPAPersisterProvider;
 import org.rapidoid.lambda.NParamLambda;
 import org.rapidoid.lambda.OneParamLambda;
 import org.rapidoid.log.Log;
@@ -63,26 +62,19 @@ import java.util.Map;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class Setup extends RapidoidThing implements Constants {
+public class Setup extends RapidoidInitializer implements Constants {
 
-	static final Setup ON = new Setup("app", "main", "0.0.0.0", 8888, IoC.defaultContext(), Conf.APP, Conf.ON);
-	static final Setup ADMIN = new Setup("admin", "admin", "0.0.0.0", 8888, IoC.defaultContext(), Conf.APP, Conf.ADMIN);
+	static final Setup ON = new Setup("app", "main", "0.0.0.0", 8888, IoC.defaultContext(), Conf.ROOT, Conf.ON);
+	static final Setup ADMIN = new Setup("admin", "admin", "0.0.0.0", 8888, IoC.defaultContext(), Conf.ROOT, Conf.ADMIN);
 
 	private static final List<Setup> instances = Coll.synchronizedList(ON, ADMIN);
 
 	static {
-		RapidoidInitializer.initialize();
-
-		Jobs.execute(new Runnable() {
-			@Override
-			public void run() {
-				JSON.warmup();
-			}
-		});
-
 		if (Ctxs.getPersisterProvider() == null) {
-			Ctxs.setPersisterProvider(new JPAPersisterProvider());
+			Ctxs.setPersisterProvider(new CustomizableSetupAwarePersisterProvider());
 		}
+
+		JSON.warmUp();
 
 		Runtime.getRuntime().addShutdownHook(new Thread() {
 			public void run() {
@@ -95,8 +87,8 @@ public class Setup extends RapidoidThing implements Constants {
 	}
 
 	private final String name;
-	private final String segment;
-	private final Config appConfig;
+	private final String zone;
+	private final Config config;
 	private final Config serverConfig;
 
 	private final String defaultAddress;
@@ -118,7 +110,6 @@ public class Setup extends RapidoidThing implements Constants {
 	private volatile Server server;
 	private volatile boolean activated;
 	private volatile boolean reloaded;
-	private volatile boolean goodies = true;
 
 	protected volatile WebSocketProtocol wsProto;
 
@@ -137,22 +128,22 @@ public class Setup extends RapidoidThing implements Constants {
 		instances.remove(this);
 	}
 
-	protected Setup(String name, String segment, String defaultAddress, int defaultPort, IoCContext ioCContext, Config appConfig, Config serverConfig) {
+	private Setup(String name, String zone, String defaultAddress, int defaultPort, IoCContext ioCContext, Config config, Config serverConfig) {
 		this.name = name;
-		this.segment = segment;
+		this.zone = zone;
 
 		this.defaultAddress = defaultAddress;
 		this.defaultPort = defaultPort;
 
 		this.ioCContext = ioCContext;
 
-		this.appConfig = appConfig;
+		this.config = config;
 		this.serverConfig = serverConfig;
 
-		this.customization = new Customization(name, appConfig, serverConfig);
+		this.customization = new Customization(name, My.custom(), config, serverConfig);
 		this.routes = new HttpRoutesImpl(customization);
 
-		this.defaults.segment(segment);
+		this.defaults.zone(zone);
 	}
 
 	public FastHttp http() {
@@ -170,9 +161,9 @@ public class Setup extends RapidoidThing implements Constants {
 
 			if (http == null) {
 				if (isAppOrAdminOnSameServer()) {
-					http = new FastHttp(wsProto(), ON.routes, ADMIN.routes);
+					http = new FastHttp(wsProto(), U.array(ON.routes, ADMIN.routes), ON.serverConfig);
 				} else {
-					http = new FastHttp(wsProto(), routes);
+					http = new FastHttp(wsProto(), U.array(routes), serverConfig);
 				}
 			}
 		}
@@ -212,11 +203,18 @@ public class Setup extends RapidoidThing implements Constants {
 			}
 
 			if (server == null) {
+				int onPort;
+
 				if (isAppOrAdminOnSameServer()) {
-					server = proc.listen(ON.address(), ON.port());
+					onPort = ON.port();
+					server = proc.listen(ON.address(), onPort);
 				} else {
-					server = proc.listen(address(), port());
+					onPort = port();
+					server = proc.listen(address(), onPort);
 				}
+
+				Log.info("!Server has started", "setup", name(), "!home", "http://localhost:" + onPort);
+				Log.info("!Static resources will be served from the following locations", "setup", name(), "!locations", custom().staticFilesPath());
 			}
 		}
 
@@ -255,13 +253,11 @@ public class Setup extends RapidoidThing implements Constants {
 		return this == ON;
 	}
 
-	private synchronized void activate() {
+	public synchronized void activate() {
 		if (activated) {
 			return;
 		}
 		activated = true;
-
-		Log.setStyled(Env.dev());
 
 		if (!reloaded) {
 			listen();
@@ -419,11 +415,10 @@ public class Setup extends RapidoidThing implements Constants {
 		processor = null;
 		activated = false;
 		ioCContext.reset();
-		goodies = true;
 		server = null;
 
 		defaults = new RouteOptions();
-		defaults().segment(segment);
+		defaults().zone(zone);
 
 		if (isApp()) {
 			AppInfo.isAppServerActive = false;
@@ -477,13 +472,20 @@ public class Setup extends RapidoidThing implements Constants {
 		ioCContext.reset();
 		http().resetConfig();
 		defaults = new RouteOptions();
-		defaults.segment(segment);
+		defaults.zone(zone);
 		attributes().clear();
 		initDefaults();
 	}
 
 	static void initDefaults() {
 		ADMIN.defaults().roles(Role.ADMINISTRATOR);
+
+		ADMIN.routes().onInit(new Runnable() {
+			@Override
+			public void run() {
+				AuthBootstrap.bootstrapAdminCredentials();
+			}
+		});
 	}
 
 	public static List<Setup> instances() {
@@ -506,15 +508,6 @@ public class Setup extends RapidoidThing implements Constants {
 		return new RouteOptions();
 	}
 
-	public boolean goodies() {
-		return goodies;
-	}
-
-	public Setup goodies(boolean goodies) {
-		this.goodies = goodies;
-		return this;
-	}
-
 	public String name() {
 		return name;
 	}
@@ -523,24 +516,32 @@ public class Setup extends RapidoidThing implements Constants {
 		return defaults;
 	}
 
-	public String segment() {
-		return segment;
+	public String zone() {
+		return zone;
 	}
 
 	public boolean isRunning() {
 		return activated;
 	}
 
-	public static void haltAll() {
+	public static synchronized void haltAll() {
 		for (Setup setup : instances()) {
 			setup.halt();
 		}
 	}
 
-	public static void shutdownAll() {
+	public static synchronized void shutdownAll() {
 		for (Setup setup : instances()) {
 			setup.shutdown();
 		}
+	}
+
+	public static synchronized boolean isAnyRunning() {
+		for (Setup setup : instances()) {
+			if (setup.isRunning()) return true;
+		}
+
+		return false;
 	}
 
 	public int port() {
@@ -581,4 +582,9 @@ public class Setup extends RapidoidThing implements Constants {
 
 		return address;
 	}
+
+	public OnError error(Class<? extends Throwable> error) {
+		return new OnError(customization, error);
+	}
+
 }

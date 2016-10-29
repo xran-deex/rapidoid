@@ -27,7 +27,8 @@ import org.rapidoid.cls.Cls;
 import org.rapidoid.commons.AnyObj;
 import org.rapidoid.commons.English;
 import org.rapidoid.commons.Str;
-import org.rapidoid.commons.TimeSeries;
+import org.rapidoid.html.ElementGroup;
+import org.rapidoid.timeseries.TimeSeries;
 import org.rapidoid.gui.base.AbstractWidget;
 import org.rapidoid.gui.input.*;
 import org.rapidoid.gui.reqinfo.IReqInfo;
@@ -201,7 +202,7 @@ public abstract class GUI extends HTML implements Role {
 		ButtonTag btn = button(span("Toggle navigation").class_("sr-only"), icon("bar"), icon("bar"), icon("bar"));
 
 		btn = btn.type("button").class_("navbar-toggle collapsed").attr("data-toggle", "collapse")
-				.attr("data-target", "#collapsable");
+			.attr("data-target", "#collapsable");
 
 		return btn;
 	}
@@ -241,7 +242,7 @@ public abstract class GUI extends HTML implements Role {
 
 		for (int i = 0; i < fields.length; i++) {
 			InputTag inp = input().type("text").class_("form-control").name(fields[i]).id("navbar-" + fields[i])
-					.placeholder(placeholders[i]);
+				.placeholder(placeholders[i]);
 			ctrls = ctrls.append(inp);
 		}
 
@@ -251,7 +252,7 @@ public abstract class GUI extends HTML implements Role {
 
 	public static FormTag navbarSearchForm(String action) {
 		return navbarForm(false, fa("search"), arr("q"), arr("Search")).attr("action", action).attr("method",
-				"GET");
+			"GET");
 	}
 
 	public static Object navbarPage(boolean fluid, Tag brand, Object[] navbarContent, Object pageContent) {
@@ -612,8 +613,8 @@ public abstract class GUI extends HTML implements Role {
 
 	private static boolean isBean(Object obj) {
 		return Cls.isBean(obj)
-				&& !(obj instanceof Tag)
-				&& !(obj instanceof AbstractWidget);
+			&& !(obj instanceof Tag)
+			&& !(obj instanceof AbstractWidget);
 	}
 
 	private static Object display(Iterator<?> it) {
@@ -779,9 +780,9 @@ public abstract class GUI extends HTML implements Role {
 		}
 
 		Map<String, ?> model = U.map("points", points, "names", U.list(ts.title()), "title", ts.title(),
-				"id", newId(), "class", divClass, "uri", Str.triml(uri, "/"));
+			"id", newId(), "class", divClass, "uri", Str.triml(uri, "/"));
 
-		Tag graph = hardcoded(Templates.fromFile("dygraphs.html").render(model));
+		Tag graph = hardcoded(Templates.load("dygraphs.html").render(model));
 
 		return div(graph);
 	}
@@ -790,12 +791,17 @@ public abstract class GUI extends HTML implements Role {
 		return dygraph(uri, ts, "rapidoid-dygraph");
 	}
 
+	public static String uri(String... parts) {
+		return ReqInfo.get().contextPath() + Msc.uri(parts);
+	}
+
 	public static String uriFor(Object target) {
 		if (!isEntity(target)) {
 			return "";
 		}
 
-		return uriFor(typeUri(target.getClass()), target);
+		String typeUri = typeUri(target.getClass());
+		return uriFor(typeUri, target);
 	}
 
 	public static String uriFor(String baseUri, Object target) {
@@ -812,9 +818,7 @@ public abstract class GUI extends HTML implements Role {
 	}
 
 	public static String typeUri(String entityType) {
-		String contextPath = req().contextPath();
-		String typeUri = English.plural(Str.uncapitalized(entityType)).toLowerCase();
-		return Msc.uri(contextPath, typeUri);
+		return uri(English.plural(Str.uncapitalized(entityType)).toLowerCase());
 	}
 
 	private static IReqInfo req() {
@@ -861,6 +865,13 @@ public abstract class GUI extends HTML implements Role {
 
 	public static Tag copy(Object... content) {
 		return div(content).class_("copy-snippet");
+	}
+
+	public static boolean isGUI(Object result) {
+		return (result instanceof Tag)
+			|| (result instanceof HtmlPage)
+			|| (result instanceof TagWidget)
+			|| (result instanceof ElementGroup);
 	}
 
 }

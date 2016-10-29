@@ -3,7 +3,8 @@ package org.rapidoid.io;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
+import org.rapidoid.commons.Env;
 import org.rapidoid.log.Log;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 /*
  * #%L
@@ -41,13 +43,13 @@ import java.util.concurrent.TimeUnit;
 @Since("4.1.0")
 public class Res extends RapidoidThing {
 
+	public static volatile Pattern REGEX_INVALID_FILENAME = Pattern.compile("(?:[*?'\"<>|\\x00-\\x1F]|\\.\\.)");
+
 	private static final ConcurrentMap<ResKey, Res> FILES = Coll.concurrentMap();
 
 	public static final ScheduledThreadPoolExecutor EXECUTOR = new ScheduledThreadPoolExecutor(1);
 
 	private static final String[] DEFAULT_LOCATIONS = {""};
-
-	private static volatile String ROOT = "";
 
 	private final String name;
 
@@ -67,11 +69,19 @@ public class Res extends RapidoidThing {
 
 	private volatile Object attachment;
 
+	private volatile boolean hidden;
+
 	private final Map<String, Runnable> changeListeners = Coll.synchronizedMap();
 
 	private Res(String name, String... possibleLocations) {
 		this.name = name;
 		this.possibleLocations = possibleLocations;
+
+		validateFilename(name);
+	}
+
+	private static void validateFilename(String filename) {
+		U.must(!Res.REGEX_INVALID_FILENAME.matcher(filename).find(), "Invalid resource name: %s", filename);
 	}
 
 	public static Res from(File file, String... possibleLocations) {
@@ -101,11 +111,12 @@ public class Res extends RapidoidThing {
 		U.must(!U.isEmpty(filename), "Resource filename must be specified!");
 		U.must(!file.isAbsolute(), "Expected relative filename!");
 
-		if (U.notEmpty(ROOT)) {
+		String root = Env.root();
+		if (U.notEmpty(Env.root())) {
 			String[] loc = new String[possibleLocations.length * 2];
 
 			for (int i = 0; i < possibleLocations.length; i++) {
-				loc[2 * i] = Msc.path(ROOT, possibleLocations[i]);
+				loc[2 * i] = Msc.path(root, possibleLocations[i]);
 				loc[2 * i + 1] = possibleLocations[i];
 			}
 
@@ -151,7 +162,7 @@ public class Res extends RapidoidThing {
 	protected void loadResource() {
 		// micro-caching the file content, expires after 500ms
 		if (U.time() - lastUpdatedOn >= 500) {
-			boolean hasChanged = false;
+			boolean hasChanged;
 
 			synchronized (this) {
 
@@ -209,20 +220,28 @@ public class Res extends RapidoidThing {
 
 		if (file.exists()) {
 
+			if (!file.isFile() || file.isDirectory()) {
+				return null;
+			}
+
 			// a normal file on the file system
 			Log.trace("Resource file exists", "name", name, "file", file);
 
 			if (file.lastModified() > this.lastModified || !filename.equals(cachedFileName)) {
 				Log.debug("Loading resource file", "name", name, "file", file);
 				this.lastModified = file.lastModified();
+				this.hidden = file.isHidden();
 				return IO.loadBytes(filename);
+
 			} else {
 				Log.trace("Resource file not modified", "name", name, "file", file);
 				return bytes;
 			}
+
 		} else {
 			// it might not exist or it might be on the classpath or compressed in a JAR
 			Log.trace("Trying to load classpath resource", "name", name, "file", file);
+			this.hidden = false;
 			return IO.loadBytes(filename);
 		}
 	}
@@ -319,20 +338,13 @@ public class Res extends RapidoidThing {
 			res.invalidate();
 		}
 		FILES.clear();
-		Res.ROOT = null;
 	}
 
 	public void invalidate() {
 		lastUpdatedOn = 0;
 	}
 
-	public static String root() {
-		return ROOT;
-	}
-
-	public static void root(String root) {
-		File dir = new File(root);
-		Log.info("Setting root folder for the resources", "!root", root, "exists", dir.exists() && dir.isDirectory());
-		Res.ROOT = root;
+	public boolean isHidden() {
+		return hidden;
 	}
 }

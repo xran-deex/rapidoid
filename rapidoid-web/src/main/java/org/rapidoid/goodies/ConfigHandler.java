@@ -63,7 +63,7 @@ public class ConfigHandler extends GUI implements Callable<Object> {
 			grids.add(1, grid(root));
 		}
 
-		return grids;
+		return multi(grids);
 	}
 
 	private String styleOf(String key) {
@@ -90,6 +90,12 @@ public class ConfigHandler extends GUI implements Callable<Object> {
 
 		} else if (U.eq(key, "jdbc")) {
 			return "bg-salmon";
+
+		} else if (U.eq(key, "token")) {
+			return "bg-purple";
+
+		} else if (U.eq(key, "http")) {
+			return "bg-teal";
 
 		} else if (U.eq(key, "jobs")) {
 			return "bg-steel";

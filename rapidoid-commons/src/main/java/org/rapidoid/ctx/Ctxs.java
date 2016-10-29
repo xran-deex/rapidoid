@@ -3,7 +3,7 @@ package org.rapidoid.ctx;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.log.Log;
 import org.rapidoid.u.U;
 
@@ -31,7 +31,7 @@ import org.rapidoid.u.U;
 @Since("4.1.0")
 public class Ctxs extends RapidoidThing {
 
-	private static final ThreadLocal<Ctx> CTXS = new ThreadLocal<Ctx>();
+	private static volatile ThreadLocal<Ctx> CTXS = new ThreadLocal<Ctx>();
 
 	private static volatile PersisterProvider persisterProvider;
 
@@ -42,7 +42,7 @@ public class Ctxs extends RapidoidThing {
 		return CTXS.get();
 	}
 
-	public static Ctx ctx() {
+	public static Ctx required() {
 		Ctx ctx = get();
 
 		if (ctx == null) {
@@ -62,7 +62,7 @@ public class Ctxs extends RapidoidThing {
 				CTXS.set(ctx);
 			}
 		} else {
-			throw new IllegalStateException("The context was already opened: " + ctx());
+			throw new IllegalStateException("The context was already opened: " + required());
 		}
 	}
 
@@ -106,14 +106,17 @@ public class Ctxs extends RapidoidThing {
 		Ctxs.persisterProvider = persisterProvider;
 	}
 
-	public static Object createPersister() {
+	public static Object createPersister(Ctx ctx) {
 		U.notNull(persisterProvider, "Ctxs.persisterProvider");
-		return persisterProvider.openPersister();
+		return persisterProvider.openPersister(ctx);
 	}
 
-	public static void closePersister(Object persister) {
+	public static void closePersister(Ctx ctx, Object persister) {
 		U.notNull(persisterProvider, "Ctxs.persisterProvider");
-		persisterProvider.closePersister(persister);
+		persisterProvider.closePersister(ctx, persister);
 	}
 
+	public static void reset() {
+		CTXS = new ThreadLocal<Ctx>();
+	}
 }

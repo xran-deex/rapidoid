@@ -3,11 +3,14 @@ package org.rapidoid.http;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.commons.Str;
+import org.rapidoid.config.BasicConfig;
 import org.rapidoid.config.Conf;
 import org.rapidoid.config.Config;
 import org.rapidoid.crypto.Crypto;
+import org.rapidoid.ctx.Ctxs;
+import org.rapidoid.ctx.UserInfo;
+import org.rapidoid.gui.reqinfo.ReqInfo;
 import org.rapidoid.http.customize.Customization;
 import org.rapidoid.http.customize.JsonResponseRenderer;
 import org.rapidoid.http.impl.PathPattern;
@@ -18,12 +21,18 @@ import org.rapidoid.u.U;
 import org.rapidoid.util.ErrCodeAndMsg;
 import org.rapidoid.util.Msc;
 
+import javax.validation.ConstraintViolation;
+import javax.validation.ConstraintViolationException;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.Serializable;
 import java.nio.BufferOverflowException;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
 /*
  * #%L
@@ -53,6 +62,8 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 
 	private static final byte[] EMPTY_RESPONSE = {};
 
+	public static volatile Pattern REGEX_VALID_HTTP_RESOURCE = Pattern.compile("(?:/[A-Za-z0-9_\\-\\.]+)*/?");
+
 	public static final String _USER = "_user";
 	public static final String _EXPIRES = "_expires";
 
@@ -63,51 +74,47 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 		}
 	};
 
-	public static String[] pathSegments(Req req) {
-		return Str.triml(req.path(), "/").split("/");
-	}
-
 	@SuppressWarnings("unchecked")
-	public static Map<String, Serializable> initAndDeserializeCookiePack(Req req) {
-		String cookiepack = req.cookie(COOKIEPACK, null);
+	public static Map<String, Serializable> initAndDeserializeToken(Req req) {
+		String token = req.cookie(TOKEN, null);
 
-		if (U.isEmpty(cookiepack)) {
-			cookiepack = req.data(TOKEN, null);
+		if (U.isEmpty(token)) {
+			token = req.data(TOKEN, null);
 		}
 
-		if (!U.isEmpty(cookiepack)) {
-			byte[] decoded = Str.fromBase64(cookiepack.replace('$', '+').replace('_', '/'));
-			byte[] cookiepackDecrypted = Crypto.decrypt(decoded);
-			return (Map<String, Serializable>) Serialize.deserialize(cookiepackDecrypted);
+		if (!U.isEmpty(token)) {
+			byte[] decoded = Str.fromBase64(token.replace('$', '+').replace('_', '/'));
+			byte[] tokenDecrypted = Crypto.decrypt(decoded);
+			return (Map<String, Serializable>) Serialize.deserialize(tokenDecrypted);
 		} else {
 			return null;
 		}
 	}
 
-	public static void saveCookipackBeforeRenderingHeaders(Req req, Map<String, Serializable> cookiepack) {
-		String token = token(cookiepack);
-		req.response().cookie(COOKIEPACK, token, "path=/", "HttpOnly");
+	public static void saveTokenBeforeRenderingHeaders(Req req, Map<String, Serializable> tokenData) {
+		String token = token(tokenData);
+		setResponseTokenCookie(req.response(), token);
 	}
 
-	public static String token(Map<String, Serializable> cookiepack) {
-		if (U.notEmpty(cookiepack)) {
-			byte[] cookiepackBytes = serializeCookiepack(cookiepack);
-			byte[] cookiepackEncrypted = Crypto.encrypt(cookiepackBytes);
-			return Str.toBase64(cookiepackEncrypted).replace('+', '$').replace('/', '_');
+	public static String token(Map<String, Serializable> token) {
+		if (U.notEmpty(token)) {
+			byte[] tokenBytes = serializeToken(token);
+			byte[] tokenEncrypted = Crypto.encrypt(tokenBytes);
+			return Str.toBase64(tokenEncrypted).replace('+', '$').replace('/', '_');
 
 		} else {
 			return "";
 		}
 	}
 
-	private static byte[] serializeCookiepack(Map<String, Serializable> cookiepack) {
+	private static byte[] serializeToken(Map<String, Serializable> token) {
 		byte[] dest = new byte[2500];
 
 		try {
-			int size = Serialize.serialize(dest, cookiepack);
+			int size = Serialize.serialize(dest, token);
 			dest = Arrays.copyOf(dest, size);
 		} catch (BufferOverflowException e) {
-			throw U.rte("The cookie-pack is too big!");
+			throw U.rte("The token is too big!");
 		}
 		return dest;
 	}
@@ -120,29 +127,23 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 		return req.verb().equalsIgnoreCase(POST);
 	}
 
-	public static String resName(String path) {
-
-		String res = Str.replace(path, PathPattern.PATH_PARAM_REGEX, PATH_PARAM_EXTRACTOR);
-
-		res = Str.triml(res, "/");
-
-		if (res.isEmpty()) {
-			res = "index";
-		} else {
-			if (res.endsWith(".html")) {
-				res = Str.sub(res, 0, -5);
-			}
-		}
-
-		return res;
+	public static String resName(Req req) {
+		return req.route() != null ? resNameFromRoutePath(req.route().path()) : resName(req.path());
 	}
 
-	public static String verbAndResourceName(Req req) {
-		return req.verb().toUpperCase() + "/" + resName(req.path());
-	}
-
-	public static String defaultView(String path) {
+	public static String resNameFromRoutePath(String path) {
+		path = Str.replace(path, PathPattern.PATH_PARAM_REGEX, PATH_PARAM_EXTRACTOR);
 		return resName(path);
+	}
+
+	public static String resName(String path) {
+		if (U.notEmpty(path) && REGEX_VALID_HTTP_RESOURCE.matcher(path).matches() && !path.contains("..")) {
+			String res = Str.triml(path, "/");
+			return res.isEmpty() ? "index" : Str.trimr(res, ".html");
+
+		} else {
+			return null;
+		}
 	}
 
 	public static boolean hasExtension(String name) {
@@ -165,10 +166,13 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 	}
 
 	public static Res staticPage(Req req, String... possibleLocations) {
-		String resName = resName(req.path());
+		String resName = resName(req);
+
+		if (resName == null) return null;
 
 		if (hasExtension(resName)) {
 			return Res.from(resName, possibleLocations);
+
 		} else {
 			Res res = Res.from(resName, possibleLocations);
 
@@ -180,8 +184,60 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 		}
 	}
 
+	public static ErrCodeAndMsg getErrorCodeAndMsg(Throwable err) {
+		Throwable cause = Msc.rootCause(err);
+
+		int code;
+		String defaultMsg;
+		String msg = cause.getMessage();
+
+		if (cause instanceof SecurityException) {
+			code = 403;
+			defaultMsg = "Access Denied!";
+
+		} else if (cause instanceof NotFound) {
+			code = 404;
+			defaultMsg = "The requested resource could not be found!";
+
+		} else if (Msc.isValidationError(cause)) {
+			code = 422;
+			defaultMsg = "Validation Error!";
+
+			if (cause.getClass().getName().equals("javax.validation.ConstraintViolationException")) {
+				Set<ConstraintViolation<?>> violations = ((ConstraintViolationException) cause).getConstraintViolations();
+
+				StringBuilder sb = new StringBuilder();
+				sb.append("Validation failed: ");
+
+				for (Iterator<ConstraintViolation<?>> it = U.safe(violations).iterator(); it.hasNext(); ) {
+					ConstraintViolation<?> v = it.next();
+
+					sb.append(v.getRootBeanClass().getSimpleName());
+					sb.append(".");
+					sb.append(v.getPropertyPath());
+					sb.append(" (");
+					sb.append(v.getMessage());
+					sb.append(")");
+
+					if (it.hasNext()) {
+						sb.append(", ");
+					}
+				}
+
+				msg = sb.toString();
+			}
+
+		} else {
+			code = 500;
+			defaultMsg = "Internal Server Error!";
+		}
+
+		msg = U.or(msg, defaultMsg);
+		return new ErrCodeAndMsg(code, msg);
+	}
+
 	public static String getErrorMessageAndSetCode(Resp resp, Throwable err) {
-		ErrCodeAndMsg codeAndMsg = Msc.getErrorCodeAndMsg(err);
+		ErrCodeAndMsg codeAndMsg = getErrorCodeAndMsg(err);
 		resp.code(codeAndMsg.code());
 		return codeAndMsg.msg();
 	}
@@ -245,12 +301,12 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 		return (Conf.ROOT.is("https") ? "https://" : "http://") + x.host() + path;
 	}
 
-	public static byte[] responseToBytes(Object result, MediaType contentType, JsonResponseRenderer jsonRenderer) {
-		if (U.eq(contentType, MediaType.JSON_UTF_8)) {
+	public static byte[] responseToBytes(Req req, Object result, MediaType contentType, JsonResponseRenderer jsonRenderer) {
+		if (U.eq(contentType, MediaType.JSON)) {
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 
 			try {
-				jsonRenderer.renderJson(result, out);
+				jsonRenderer.renderJson(req, result, out);
 			} catch (Exception e) {
 				throw U.rte(e);
 			}
@@ -277,13 +333,63 @@ public class HttpUtils extends RapidoidThing implements HttpMetadata {
 		}
 	}
 
-	public static String getContextPath(Customization customization, String segment) {
-		Config cfg = customization.appConfig();
+	public static String getContextPath(Req req) {
+		return zone(req).entry("contextPath").or("");
+	}
 
-		if (segment != null) {
-			cfg = cfg.sub("segments", segment);
+	public static BasicConfig zone(Customization custom, String zone) {
+		Config appConfig = custom.config().sub("app");
+
+		if (zone != null) {
+			String zoneKey = zone + "-zone";
+			return custom.config().sub(zoneKey).or(appConfig);
+
+		} else {
+			return appConfig;
+		}
+	}
+
+	public static BasicConfig zone(Req req) {
+		Customization custom = Customization.of(req);
+		return zone(custom, req.zone());
+	}
+
+	@SuppressWarnings("unchecked")
+	public static Object postprocessResult(Req req, Object result) throws Exception {
+
+		if (result instanceof Req || result instanceof Resp || result instanceof HttpStatus) {
+			return result;
+
+		} else if (result == null) {
+			return null; // not found
+
+		} else if ((result instanceof Future<?>) || (result instanceof org.rapidoid.concurrent.Future<?>)) {
+			return req.async();
+
+		} else {
+			return result;
+		}
+	}
+
+	public static void setResponseTokenCookie(Resp resp, String token) {
+		resp.cookie(TOKEN, token, "HttpOnly");
+	}
+
+	public static String cookiePath() {
+		String ctxPath = ReqInfo.get().contextPath();
+		return U.notEmpty(ctxPath) ? ctxPath : "/";
+	}
+
+	public static void clearUserData(Req req) {
+		if (Ctxs.hasContext()) {
+			Ctxs.required().setUser(UserInfo.ANONYMOUS);
 		}
 
-		return cfg.entry("contextPath").or("/");
+		if (req.hasToken()) {
+			Map<String, Serializable> token = req.token();
+			token.remove(_USER);
+			token.remove(_EXPIRES);
+		}
 	}
+
 }

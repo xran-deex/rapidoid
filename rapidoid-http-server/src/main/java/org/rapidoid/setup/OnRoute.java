@@ -4,7 +4,6 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.annotation.TransactionMode;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.http.*;
 import org.rapidoid.http.handler.HttpHandler;
 import org.rapidoid.http.handler.HttpHandlers;
@@ -74,11 +73,19 @@ public class OnRoute extends RapidoidThing {
 	/* GENERIC */
 
 	public void serve(String response) {
-		HttpHandlers.registerPredefined(http, routes, verb, path, options, response);
+		if (options.managed()) {
+			HttpHandlers.registerPredefined(http, routes, verb, path, options, response);
+		} else {
+			HttpHandlers.registerStatic(http, routes, verb, path, options, response.getBytes());
+		}
 	}
 
 	public void serve(byte[] response) {
-		HttpHandlers.registerPredefined(http, routes, verb, path, options, response);
+		if (options.managed()) {
+			HttpHandlers.registerPredefined(http, routes, verb, path, options, response);
+		} else {
+			HttpHandlers.registerStatic(http, routes, verb, path, options, response);
+		}
 	}
 
 	public <T> void serve(Callable<T> handler) {
@@ -126,10 +133,6 @@ public class OnRoute extends RapidoidThing {
 	}
 
 	/* HTML */
-
-	public void staticHtml(byte[] response) {
-		HttpHandlers.registerStatic(http, routes, verb, path, htmlOpts(), response);
-	}
 
 	public void html(String response) {
 		HttpHandlers.registerPredefined(http, routes, verb, path, htmlOpts(), response);
@@ -185,10 +188,6 @@ public class OnRoute extends RapidoidThing {
 
 	/* JSON */
 
-	public void staticJson(byte[] response) {
-		HttpHandlers.registerStatic(http, routes, verb, path, jsonOpts(), response);
-	}
-
 	public void json(String response) {
 		HttpHandlers.registerPredefined(http, routes, verb, path, jsonOpts(), response);
 	}
@@ -242,10 +241,6 @@ public class OnRoute extends RapidoidThing {
 	}
 
 	/* PLAIN */
-
-	public void staticPlain(byte[] response) {
-		HttpHandlers.registerStatic(http, routes, verb, path, plainOpts(), response);
-	}
 
 	public void plain(String response) {
 		HttpHandlers.registerPredefined(http, routes, verb, path, plainOpts(), response);
@@ -364,7 +359,7 @@ public class OnRoute extends RapidoidThing {
 	}
 
 	private RouteOptions jsonOpts() {
-		return opts(MediaType.JSON_UTF_8);
+		return opts(MediaType.JSON);
 	}
 
 	private RouteOptions plainOpts() {
@@ -382,8 +377,8 @@ public class OnRoute extends RapidoidThing {
 
 	/* ROUTE OPTIONS */
 
-	public OnRoute wrap(HttpWrapper... wrappers) {
-		options.wrap(wrappers);
+	public OnRoute wrappers(HttpWrapper... wrappers) {
+		options.wrappers(wrappers);
 		return this;
 	}
 
@@ -397,6 +392,11 @@ public class OnRoute extends RapidoidThing {
 		return this;
 	}
 
+	public OnRoute contentType(MediaType contentType) {
+		options.contentType(contentType);
+		return this;
+	}
+
 	public OnRoute tx(TransactionMode txMode) {
 		options.transactionMode(txMode);
 		return this;
@@ -406,8 +406,13 @@ public class OnRoute extends RapidoidThing {
 		return tx(TransactionMode.AUTO);
 	}
 
-	public OnRoute segment(String segment) {
-		options.segment(segment);
+	public OnRoute zone(String zone) {
+		options.zone(zone);
+		return this;
+	}
+
+	public OnRoute managed(boolean managed) {
+		options.managed(managed);
 		return this;
 	}
 

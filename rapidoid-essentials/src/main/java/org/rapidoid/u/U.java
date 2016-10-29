@@ -20,6 +20,9 @@ package org.rapidoid.u;
  * #L%
  */
 
+import org.rapidoid.RapidoidThing;
+
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 
@@ -27,29 +30,55 @@ import java.util.concurrent.CancellationException;
  * @author Nikolche Mihajlovski
  * @since 2.0.0
  */
-public class U {
+public class U extends RapidoidThing {
 
+	private static final int PRINTABLE_ARR_MAX_SIZE = 30;
+
+	@SuppressWarnings("ImplicitArrayToString")
 	public static String str(Object obj) {
-		if (obj == null) {
+
+		if (obj instanceof String) {
+			return (String) obj;
+
+		} else if (obj == null) {
 			return null;
+
 		} else if (obj instanceof byte[]) {
-			return Arrays.toString((byte[]) obj);
+			byte[] arr = (byte[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof short[]) {
-			return Arrays.toString((short[]) obj);
+			short[] arr = (short[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof int[]) {
-			return Arrays.toString((int[]) obj);
+			int[] arr = (int[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof long[]) {
-			return Arrays.toString((long[]) obj);
+			long[] arr = (long[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof float[]) {
-			return Arrays.toString((float[]) obj);
+			float[] arr = (float[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof double[]) {
-			return Arrays.toString((double[]) obj);
+			double[] arr = (double[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof boolean[]) {
-			return Arrays.toString((boolean[]) obj);
+			boolean[] arr = (boolean[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof char[]) {
-			return Arrays.toString((char[]) obj);
+			char[] arr = (char[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? Arrays.toString(arr) : arr.toString();
+
 		} else if (obj instanceof Object[]) {
-			return str((Object[]) obj);
+			Object[] arr = (Object[]) obj;
+			return arr.length < PRINTABLE_ARR_MAX_SIZE ? str(arr) : arr.toString();
+
 		} else {
 			return String.valueOf(obj);
 		}
@@ -184,6 +213,23 @@ public class U {
 	@SuppressWarnings({"varargs"})
 	public static <T> T[] array(T... items) {
 		return items;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> T[] arrayOf(Class<T> type, T... elements) {
+		T[] array = (T[]) Array.newInstance(type, elements.length);
+		System.arraycopy(elements, 0, array, 0, elements.length);
+		return array;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> T[] arrayOf(Class<T> type, Iterable<? extends T> items) {
+		Collection<T> coll = (items instanceof Collection) ? (Collection<T>) items : list(items);
+
+		T[] array = (T[]) Array.newInstance(type, coll.size());
+
+		coll.toArray(array);
+		return array;
 	}
 
 	public static Object[] array(Iterable<?> items) {

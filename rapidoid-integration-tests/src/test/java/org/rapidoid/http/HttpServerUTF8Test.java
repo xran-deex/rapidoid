@@ -30,7 +30,7 @@ import java.nio.charset.Charset;
 
 @Authors("Nikolche Mihajlovski")
 @Since("2.0.0")
-public class HttpServerUTF8Test extends IntegrationTestCommons {
+public class HttpServerUTF8Test extends IsolatedIntegrationTest {
 
 	@Test
 	public void shouldHandleUTF8() {
@@ -39,7 +39,7 @@ public class HttpServerUTF8Test extends IntegrationTestCommons {
 		System.out.println("file.encoding = " + System.getProperty("file.encoding"));
 		System.out.println("Charset.defaultCharset() = " + Charset.defaultCharset());
 		System.out.println("default writer.encoding = "
-				+ new OutputStreamWriter(new ByteArrayOutputStream()).getEncoding());
+			+ new OutputStreamWriter(new ByteArrayOutputStream()).getEncoding());
 
 		String message = "ažфbдšгcč";
 		System.out.println("UTF-8 message = " + message);

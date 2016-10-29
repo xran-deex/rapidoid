@@ -22,15 +22,21 @@ package org.rapidoid.test;
 
 import org.junit.Before;
 import org.rapidoid.config.Conf;
+import org.rapidoid.ctx.Ctxs;
 import org.rapidoid.data.JSON;
+import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
 
 public abstract class AbstractCommonsTest extends TestCommons {
 
 	@Before
-	public void openContext() {
+	public final void resetContext() {
 		Msc.reset();
-		Conf.setPath(getTestName());
+
+		Ctxs.reset();
+		U.must(Ctxs.get() == null);
+
+		Conf.ROOT.setPath(getTestName());
 	}
 
 	protected void verify(String name, Object actual) {

@@ -41,25 +41,44 @@ public class BytesUtilTest extends BufferTestCommons {
 		isTrue(isValid("/xx%34%64/"));
 		isTrue(isValid("/abc-=-=_=+fg/"));
 		isTrue(isValid("/-=AaaaA!0!!AZazf=__/_.-=-.=_=.+/fg01.++--2AaaAa34.56789/"));
+		isTrue(isValid("/.ff"));
+		isTrue(isValid("/.some-private/"));
+		isTrue(isValid("/ok/./x"));
+		isTrue(isValid("/ok/././xyz.abc"));
+		isTrue(isValid("/."));
+		isTrue(isValid("/?/../"));
+		isTrue(isValid("/?ff/../"));
+		isTrue(isValid("/?/../"));
+		isTrue(isValid("/abc?//"));
+		isTrue(isValid("/x?."));
+		isTrue(isValid("/a/b/c?x=..&y=3d"));
+		isTrue(isValid("/?x=../..////...."));
+		isTrue(isValid("/?../..////...."));
+		isTrue(isValid("/a:b:c"));
+		isTrue(isValid("/z2-._:/#[]@!$&()'*+,;=%01"));
+		isTrue(isValid("/z?2-._:/#[]@!$&()'*+,;=%01"));
+		isTrue(isValid("/document/?uri=http://user:password@example.com/?foo=bar"));
 	}
 
 	@Test
 	public void testInalidURIs() {
 		isFalse(isValid(""));
 		isFalse(isValid("//"));
-		isFalse(isValid("/."));
 		isFalse(isValid("./"));
 		isFalse(isValid(".."));
 		isFalse(isValid("f"));
 		isFalse(isValid("."));
-		isFalse(isValid("/.ff/"));
-		isFalse(isValid("/.some-private/"));
 		isFalse(isValid("sdfgdfg"));
 		isFalse(isValid("/Дфг"));
 		isFalse(isValid("/ok/../x"));
 		isFalse(isValid("/ok/../../xyz.abc"));
-		isFalse(isValid("/ok/./x"));
-		isFalse(isValid("/ok/././xyz.abc"));
+		isFalse(isValid("/f\\b"));
+		isFalse(isValid("/f\\bg"));
+		isFalse(isValid("/f\ng"));
+		isFalse(isValid("/f\rg"));
+		isFalse(isValid("/f\tg"));
+		isFalse(isValid("/\ng"));
+		isFalse(isValid("\ng"));
 	}
 
 	private boolean isValid(String uri) {

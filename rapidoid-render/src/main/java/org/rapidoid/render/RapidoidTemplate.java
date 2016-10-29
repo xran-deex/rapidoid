@@ -1,11 +1,15 @@
 package org.rapidoid.render;
 
 import org.rapidoid.RapidoidThing;
+import org.rapidoid.activity.RapidoidThreadLocals;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.u.U;
+import org.rapidoid.util.Msc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
+import java.util.List;
 
 /*
  * #%L
@@ -35,20 +39,72 @@ public class RapidoidTemplate extends RapidoidThing implements Template {
 
 	private final TemplateRenderer template;
 
-	public RapidoidTemplate(String filename, TemplateRenderer template) {
+	private final TemplateFactory factory;
+
+	public RapidoidTemplate(String filename, TemplateRenderer template, TemplateFactory factory) {
 		this.filename = filename;
 		this.template = template;
+		this.factory = factory;
 	}
 
-	public void renderTo(OutputStream output, Object... scopes) {
-		template.render(new RenderCtxImpl(output, filename, scopes));
+	void doRenderMulti(RapidoidThreadLocals locals, OutputStream output, List<Object> model) {
+		RenderCtxImpl renderCtx = initRenderCtx(locals);
+
+		renderCtx.out(output).factory(factory).filename(filename).multiModel(model);
+
+		template.render(renderCtx);
+
+		renderCtx.reset();
+	}
+
+	void doRender(RapidoidThreadLocals locals, OutputStream output, Object model) {
+		RenderCtxImpl renderCtx = initRenderCtx(locals);
+
+		renderCtx.out(output).factory(factory).filename(filename).model(model);
+
+		template.render(renderCtx);
+
+		renderCtx.reset();
+	}
+
+	private RenderCtxImpl initRenderCtx(RapidoidThreadLocals locals) {
+		RenderCtxImpl renderCtx = (RenderCtxImpl) locals.renderContext;
+
+		if (renderCtx == null) {
+			renderCtx = new RenderCtxImpl();
+			locals.renderContext = renderCtx;
+		}
+
+		return renderCtx;
+	}
+
+	public void renderMultiModel(OutputStream output, Object... model) {
+		doRenderMulti(Msc.locals(), output, U.list(model));
 	}
 
 	@Override
-	public String render(Object... scopes) {
-		ByteArrayOutputStream out = new ByteArrayOutputStream();
-		renderTo(out, scopes);
-		return out.toString();
+	public void renderTo(OutputStream output, Object model) {
+		doRender(Msc.locals(), output, model);
+	}
+
+	@Override
+	public byte[] renderToBytes(Object model) {
+		RapidoidThreadLocals locals = Msc.locals();
+
+		ByteArrayOutputStream out = locals.templateRenderingStream();
+
+		doRender(locals, out, model);
+
+		return out.toByteArray();
+	}
+
+	@Override
+	public String render(Object model) {
+		return new String(renderToBytes(model));
+	}
+
+	public void renderInContext(RenderCtxImpl renderCtx) {
+		template.render(renderCtx);
 	}
 
 }

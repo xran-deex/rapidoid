@@ -27,32 +27,34 @@ import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.POST;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.data.JSON;
+import org.rapidoid.setup.Admin;
 import org.rapidoid.setup.App;
+import org.rapidoid.setup.My;
 import org.rapidoid.setup.On;
 import org.rapidoid.u.U;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class CustomizationTest extends IntegrationTestCommons {
+public class CustomizationTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void testSerializationConfig() {
-		On.custom().jsonResponseRenderer(JSON::prettify);
+		On.custom().jsonResponseRenderer((req, value, out) -> JSON.prettify(value, out));
 
 		On.get("/").json(() -> U.map("foo", 12, "bar", 345));
 		On.get("/a").json(() -> U.map("foo", 12, "bar", 345));
 
 		onlyGet("/");
 
-		On.custom().jsonResponseRenderer(JSON::stringify);
+		On.custom().jsonResponseRenderer((req, value, out) -> JSON.stringify(value, out));
 
 		onlyGet("/a");
 	}
 
 	@Test
 	public void testAuthConfig() {
-		On.custom().loginProvider((username, password) -> password.equals(username + "!"));
-		On.custom().rolesProvider(username -> username.equals("root") ? U.set("admin") : U.set());
+		On.custom().loginProvider((req, username, password) -> password.equals(username + "!"));
+		On.custom().rolesProvider((req, username) -> username.equals("root") ? U.set("admin") : U.set());
 		// FIXME complete the test
 	}
 
@@ -85,6 +87,53 @@ public class CustomizationTest extends IntegrationTestCommons {
 
 		@JsonProperty("the-name")
 		public String name;
+	}
+
+	@Test
+	public void customJsonBodyParser() {
+		My.jsonRequestBodyParser((req, body) -> U.map("uri", req.uri(), "parsed", JSON.parse(body)));
+
+		On.post("/abc").json(req -> req.data());
+		On.req(req -> req.posted());
+
+		postData("/abc?multipart", U.map("x", 13579, "foo", "bar"));
+		postData("/abc2?multipart", U.map("x", 13579, "foo", "bar"));
+
+		postJson("/abc?custom", U.map("x", 13579, "foo", "bar"));
+		postJson("/abc2?custom", U.map("x", 13579, "foo", "bar"));
+	}
+
+	@Test
+	public void customErrorHandlerByType() {
+		Admin.error(NullPointerException.class).handler((req1, resp, e) -> "ADMIN NPE");
+		My.error(NullPointerException.class).handler((req1, resp, e) -> "MY NPE");
+
+		My.error(RuntimeException.class).handler((req1, resp, e) -> e instanceof NotFound ? null : "MY RTE");
+
+		On.error(SecurityException.class).handler((req1, resp, e) -> "ON SEC");
+		Admin.error(SecurityException.class).handler((req1, resp, e) -> "ADMIN SEC");
+		My.error(SecurityException.class).handler((req1, resp, e) -> "MY SEC");
+
+		On.get("/err1").json(req -> {
+			throw new NullPointerException();
+		});
+
+		On.post("/err2").json(req -> {
+			throw new RuntimeException();
+		});
+
+		On.get("/err3").json(req -> {
+			throw new SecurityException("denied!");
+		});
+
+		On.get("/err4").json(req -> {
+			throw new OutOfMemoryError("out of memory!");
+		});
+
+		onlyGet("/err1");
+		onlyPost("/err2");
+		onlyGet("/err3");
+		onlyGet("/err4");
 	}
 
 }

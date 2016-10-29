@@ -2,11 +2,11 @@ package org.rapidoid.scan;
 
 import javassist.bytecode.AnnotationsAttribute;
 import javassist.bytecode.ClassFile;
-import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.cls.Cls;
 import org.rapidoid.commons.Str;
+import org.rapidoid.config.RapidoidInitializer;
 import org.rapidoid.lambda.Predicate;
 import org.rapidoid.log.Log;
 import org.rapidoid.u.U;
@@ -44,7 +44,7 @@ import java.util.zip.ZipFile;
 
 @Authors("Nikolche Mihajlovski")
 @Since("2.0.0")
-public class ClasspathUtil extends RapidoidThing {
+public class ClasspathUtil extends RapidoidInitializer {
 
 	private static final Set<String> CLASSPATH = new TreeSet<String>();
 
@@ -113,7 +113,7 @@ public class ClasspathUtil extends RapidoidThing {
 		String[] pkgs = params.in();
 
 		if (U.isEmpty(pkgs)) {
-			pkgs = new String[]{rootPackage};
+			pkgs = rootPackage != null ? new String[]{rootPackage} : new String[]{""};
 		}
 
 		long startingAt = U.time();
@@ -137,7 +137,8 @@ public class ClasspathUtil extends RapidoidThing {
 		List<String> classList = U.list(classes);
 
 		long timeMs = U.time() - startingAt;
-		Log.info("Finished classpath scan", "time", timeMs + "ms", "searched", searched.get(), "!found", Msc.classNames(classList));
+
+		Log.info("Finished classpath scan", "time", Msc.maybeMasked(timeMs) + "ms", "searched", searched.get(), "!found", Msc.classNames(classList));
 
 		return classList;
 	}
@@ -185,7 +186,7 @@ public class ClasspathUtil extends RapidoidThing {
 					Log.warn("Invalid classpath entry: " + cpe);
 				}
 			} else {
-				if (!cpe.contains("*") && !cpe.contains("?")) {
+				if (!cpe.contains("*") && !cpe.contains("?") && U.neq(cpe, appJar)) {
 					Log.warn("Classpath entry doesn't exist: " + cpe);
 				}
 			}
@@ -366,7 +367,6 @@ public class ClasspathUtil extends RapidoidThing {
 			}
 
 			ClassLoader cl = ClassLoader.getSystemClassLoader();
-
 			URL[] urls = ((URLClassLoader) cl).getURLs();
 
 			for (URL url : urls) {
@@ -374,14 +374,23 @@ public class ClasspathUtil extends RapidoidThing {
 				CLASSPATH.add(new File(path).getAbsolutePath());
 			}
 
-			for (String cp : CLASSPATH) {
-				if (cp.endsWith("/app.jar") || cp.endsWith("\\app.jar")) {
-					appJar = cp;
-				}
+			if (U.isEmpty(appJar)) {
+				inferAppJarFromClasspath();
 			}
 		}
 
 		return CLASSPATH;
+	}
+
+	private static boolean inferAppJarFromClasspath() {
+		for (String cp : CLASSPATH) {
+			if (cp.endsWith("/app.jar") || cp.endsWith("\\app.jar")) {
+				appJar = cp;
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public static synchronized Set<String> getClasspathFolders() {
@@ -452,7 +461,7 @@ public class ClasspathUtil extends RapidoidThing {
 
 	public static Class<?> loadFromJar(String clsName, String jar, ClassLoader classLoader) throws Exception {
 		URL url = new File(jar).toURI().toURL();
-		URLClassLoader child = new URLClassLoader(new URL[]{url}, classLoader);
+		URLClassLoader child = new URLClassLoader(U.array(url), classLoader);
 		return Class.forName(clsName, true, child);
 	}
 
@@ -466,7 +475,9 @@ public class ClasspathUtil extends RapidoidThing {
 	}
 
 	public static void appJar(String appJar) {
-		ClasspathUtil.appJar = appJar;
-		Log.info("Setting application JAR", "!appJar", appJar, "exists", new File(appJar).exists());
+		if (U.neq(ClasspathUtil.appJar, appJar)) {
+			ClasspathUtil.appJar = appJar;
+			Log.info("Setting application JAR", "!appJar", appJar, "exists", new File(appJar).exists());
+		}
 	}
 }

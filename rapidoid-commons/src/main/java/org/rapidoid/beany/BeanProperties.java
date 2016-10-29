@@ -4,10 +4,11 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.cls.Cls;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.lambda.Lmbd;
 import org.rapidoid.lambda.Mapper;
 import org.rapidoid.u.U;
+import org.rapidoid.util.Msc;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -43,6 +44,8 @@ public class BeanProperties extends RapidoidThing implements Iterable<Prop> {
 
 	public final Map<String, Prop> map;
 
+	public final Map<String, Prop> lowercaseMap;
+
 	public final List<Prop> props;
 
 	public final List<String> names;
@@ -50,37 +53,37 @@ public class BeanProperties extends RapidoidThing implements Iterable<Prop> {
 	public final ConcurrentMap<String, Object> extras = Coll.concurrentMap();
 
 	public final Map<PropertySelector, BeanProperties> selections = Coll
-			.autoExpandingMap(new Mapper<PropertySelector, BeanProperties>() {
-				@Override
-				public BeanProperties map(PropertySelector selector) throws Exception {
+		.autoExpandingMap(new Mapper<PropertySelector, BeanProperties>() {
+			@Override
+			public BeanProperties map(PropertySelector selector) throws Exception {
 
-					Set<String> include = selector.include();
-					Set<String> exclude = selector.exclude();
+				Set<String> include = selector.include();
+				Set<String> exclude = selector.exclude();
 
-					List<Prop> selected = new ArrayList<Prop>(10);
+				List<Prop> selected = new ArrayList<Prop>(10);
 
-					for (String propName : include) {
-						Prop prop = map.get(propName);
-						U.must(prop != null, "Cannot find property '%s'!", propName);
+				for (String propName : include) {
+					Prop prop = map.get(propName);
+					U.must(prop != null, "Cannot find property '%s'!", propName);
 
-						if (!veto(prop) && Lmbd.eval(selector, prop) && Lmbd.eval(selector, prop)) {
+					if (!veto(prop) && Lmbd.eval(selector, prop) && Lmbd.eval(selector, prop)) {
+						selected.add(prop);
+					}
+				}
+
+				if (U.notEmpty(exclude) || U.isEmpty(include)) {
+					for (Prop prop : map.values()) {
+						if (!veto(prop) && !selected.contains(prop) && !exclude.contains(prop.getName()) && Lmbd.eval(selector, prop)) {
 							selected.add(prop);
 						}
 					}
-
-					if (U.notEmpty(exclude) || U.isEmpty(include)) {
-						for (Prop prop : map.values()) {
-							if (!veto(prop) && !selected.contains(prop) && !exclude.contains(prop.getName()) && Lmbd.eval(selector, prop)) {
-								selected.add(prop);
-							}
-						}
-					}
-
-					Collections.sort(selected, selector);
-
-					return from(selected);
 				}
-			});
+
+				Collections.sort(selected, selector);
+
+				return from(selected);
+			}
+		});
 
 	private boolean veto(Prop prop) {
 		return prop.getName().equalsIgnoreCase("clone");
@@ -88,8 +91,9 @@ public class BeanProperties extends RapidoidThing implements Iterable<Prop> {
 
 	public BeanProperties(Map<String, ? extends Prop> properties) {
 		this.map = Collections.unmodifiableMap(properties);
-		this.props = Collections.unmodifiableList(new ArrayList<Prop>(properties.values()));
-		this.names = Collections.unmodifiableList(new ArrayList<String>(properties.keySet()));
+		this.lowercaseMap = Msc.lowercase(map);
+		this.props = Collections.unmodifiableList(U.list(properties.values()));
+		this.names = Collections.unmodifiableList(U.list(properties.keySet()));
 	}
 
 	@Override
@@ -98,7 +102,13 @@ public class BeanProperties extends RapidoidThing implements Iterable<Prop> {
 	}
 
 	public Prop get(String property) {
-		return map.get(property);
+		Prop prop = map.get(property);
+
+		if (prop == null) {
+			prop = lowercaseMap.get(property.toLowerCase());
+		}
+
+		return prop;
 	}
 
 	public BeanProperties select(PropertySelector selector) {

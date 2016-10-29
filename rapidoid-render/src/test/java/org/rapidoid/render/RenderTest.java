@@ -89,25 +89,66 @@ public class RenderTest extends AbstractRenderTest {
 	}
 
 	@Test
-	public void testScopes() {
-		eq(Render.template("${x}").model(U.map("x", 1), U.map("x", 2)), "2");
+	public void testIteration() {
+		eq(Render.template("{{#.}}(${length}){{/.}}").model(U.list("aaa", "bb")), "(3)(2)");
+	}
 
-		eq(Render.template("${x}").model(U.map("x", 1), U.map("y", 2)), "1");
-		eq(Render.template("${y}").model(U.map("x", 1), U.map("y", 2)), "2");
-		eq(Render.template("${z}").model(U.map("x", 1), U.map("y", 2)), view(null));
+	@Test
+	public void testScopes() {
+		eq(Render.template("${x}").multiModel(U.map("x", 1), U.map("x", 2)), "2");
+
+		eq(Render.template("${x}").multiModel(U.map("x", 1), U.map("y", 2)), "1");
+		eq(Render.template("${y}").multiModel(U.map("x", 1), U.map("y", 2)), "2");
+		eq(Render.template("${z}").multiModel(U.map("x", 1), U.map("y", 2)), view(null));
 	}
 
 	@Test
 	public void testEscaping() {
 		String s = "a\r\n\tb";
 		String t = "<p id=\"foo\"><b ng-click=\"f(1, 'x', 2);\">abc</b></p>";
-		String t2 = "&lt;p id=&quot;foo&quot;&gt;&lt;b ng-click=&quot;f(1, &#39;x&#39;, 2);&quot;&gt;abc&lt;/b&gt;&lt;/p&gt;";
+		String t2 = "&lt;p id=&quot;foo&quot;&gt;&lt;b ng-click=&quot;f(1, &apos;x&apos;, 2);&quot;&gt;abc&lt;/b&gt;&lt;/p&gt;";
 
 		eq(Render.template("${.}").model(s), s);
 		eq(Render.template("@{.}").model(s), s);
 
 		eq(Render.template("${.}").model(t), t2);
 		eq(Render.template("@{.}").model(t), t);
+	}
+
+	@Test
+	public void testUTF8() {
+		eq(Render.template("Штрк-X-123").model(U.map()), "Штрк-X-123");
+		eq(Render.template("абвгд-${x}-foo").model(U.map("x", "чачача")), "абвгд-чачача-foo");
+
+		// 2-byte UTF-8 encoding
+		eq(Render.template("${x}:ш:${x}").model(U.map("x", "ч")), "ч:ш:ч");
+
+		// 3-byte UTF-8 encoding
+		eq(Render.template("${y}:€€:${y}").model(U.map("y", "€")), "€:€€:€");
+	}
+
+	@Test
+	public void testUTF8Surrogates() {
+		String a = "\uD852\uDF62";
+		String b = "\uD852\uDF63";
+
+		eq(a.length(), 2);
+		eq(b.length(), 2);
+
+		// 4-byte (surrogate) UTF-8 encoding
+		eq(Render.template("${x}:" + a + ":${x}").model(U.map("x", b)), b + ":" + a + ":" + b);
+
+		// mix of 2-byte, 3-byte and 4-byte (surrogate) UTF-8 encoding
+		eq(Render.template("шш€f€€\uD852\uDF62:${x}").model(U.map("x", "4€шf3\uD852\uDF63")), "шш€f€€\uD852\uDF62:4€шf3\uD852\uDF63");
+	}
+
+	@Test
+	public void testUTF8MalformedSurrogates() {
+		String missing = "\uD852"; // [high]
+		eq(Render.template("${x}:" + missing + ":${x}").model(U.map("x", missing)), "?:?:?");
+
+		String wrongOrder = "\uDF62\uD852"; // [low, high]
+		eq(Render.template("${x}:" + wrongOrder + ":${x}").model(U.map("x", wrongOrder)), "??:??:??");
 	}
 
 	private String view(Object x) {

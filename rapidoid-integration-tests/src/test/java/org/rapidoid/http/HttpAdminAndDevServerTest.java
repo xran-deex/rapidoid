@@ -30,7 +30,7 @@ import org.rapidoid.u.U;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class HttpAdminAndDevServerTest extends IntegrationTestCommons {
+public class HttpAdminAndDevServerTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void testAdminOnAppServer() {
@@ -48,8 +48,8 @@ public class HttpAdminAndDevServerTest extends IntegrationTestCommons {
 	}
 
 	private void sameSetup() {
-		On.get("/a").html((Req x) -> "default " + U.join(":", x.uri(), x.segment(), x.contextPath()));
-		Admin.get("/b").roles().json((Req x) -> "admin " + U.join(":", x.uri(), x.segment(), x.contextPath()));
+		On.get("/a").html((Req x) -> "default " + U.join(":", x.uri(), x.zone(), x.contextPath()));
+		Admin.get("/b").roles().json((Req x) -> "admin " + U.join(":", x.uri(), x.zone(), x.contextPath()));
 		Admin.get("/c").json((Req x) -> "unauthorized");
 		Admin.get("/d").html((Req x) -> "unauthorized");
 	}

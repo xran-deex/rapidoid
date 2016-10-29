@@ -13,6 +13,7 @@ import org.rapidoid.cls.Cls;
 import org.rapidoid.commons.Env;
 import org.rapidoid.log.Log;
 import org.rapidoid.u.U;
+import org.rapidoid.util.Msc;
 
 import java.io.OutputStream;
 import java.util.Map;
@@ -43,11 +44,11 @@ import java.util.Map;
  */
 public class JSON extends RapidoidThing {
 
-	public static final ObjectMapper MAPPER = mapper();
+	public static final ObjectMapper MAPPER = newMapper();
 
 	public static final ObjectMapper PRETTY_MAPPER = prettyMapper();
 
-	private static ObjectMapper mapper() {
+	public static ObjectMapper newMapper() {
 		ObjectMapper mapper = new ObjectMapper();
 		mapper.setBase64Variant(Base64Variants.MODIFIED_FOR_URL);
 		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -195,9 +196,14 @@ public class JSON extends RapidoidThing {
 		return parse(json, Map.class);
 	}
 
-	public static void warmup() {
-		JSON.stringify(123);
-		JSON.parse("{}", Map.class);
+	public static void warmUp() {
+		Msc.thread(new Runnable() {
+			@Override
+			public void run() {
+				JSON.stringify(123);
+				JSON.parse("{}", Map.class);
+			}
+		});
 	}
 
 	public static byte[] parseBytes(String json) {

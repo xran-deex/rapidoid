@@ -45,7 +45,7 @@ public class DeployHandler extends GUI implements Callable<Object> {
 			info.add(h2("Upload an application JAR to re-deploy:"));
 			info.add(hardcoded("<form action=\"/_/jar\" class=\"dropzone\" id=\"jar-upload\"></form>"));
 
-			String token = U.or(ReqInfo.get().cookies().get("COOKIEPACK"), "");
+			String token = U.or(ReqInfo.get().cookies().get("_token"), "");
 
 			info.add(h2("HTTP API for Deployment:"));
 			info.add(h6(verb(HttpVerb.POST), b(" http://your-app-domain/_/jar?_token=<token>")));
@@ -56,12 +56,7 @@ public class DeployHandler extends GUI implements Callable<Object> {
 
 			info.add(h6(copy(b(cmd))));
 
-		} else {
-			info.add(h3(WARN, " No ", b("app.jar"), " file was configured on the classpath, so application deployment is disabled!"));
-			info.add(h4("Application deployment works by uploading a JAR which overwrites the file 'app.jar', and restarting the application."));
-		}
-
-		Btn shutdown = btn("Shutdown / Restart").danger()
+			Btn shutdown = btn("Shutdown / Restart").danger()
 				.confirm("Do you really want to SHUTDOWN / RESTART the application?")
 				.onClick(new Runnable() {
 					@Override
@@ -70,10 +65,15 @@ public class DeployHandler extends GUI implements Callable<Object> {
 					}
 				});
 
-		info.add(br());
-		info.add(shutdown);
+			info.add(br());
+			info.add(shutdown);
 
-		return info;
+		} else {
+			info.add(h3(WARN, " No ", b("app.jar"), " file was configured on the classpath, so application deployment is disabled!"));
+			info.add(h4("Application deployment works by uploading a JAR which overwrites the file 'app.jar', and restarting the application."));
+		}
+
+		return multi(info);
 	}
 
 }

@@ -3,6 +3,9 @@ package org.rapidoid.sql;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.beany.Beany;
+import org.rapidoid.beany.Prop;
+import org.rapidoid.cls.Cls;
 import org.rapidoid.u.U;
 
 import java.sql.*;
@@ -119,15 +122,45 @@ public class JDBC extends RapidoidThing {
 		try {
 			PreparedStatement stmt = conn.prepareStatement(sql);
 
-			for (int i = 0; i < args.length; i++) {
-				Object arg = args[i];
-				stmt.setObject(i + 1, arg);
-			}
+			bind(stmt, args);
 
 			return stmt;
+
 		} catch (SQLException e) {
 			throw new RuntimeException("Cannot create prepared statement!", e);
 		}
+	}
+
+	public static void bind(PreparedStatement stmt, Object... args) throws SQLException {
+		for (int i = 0; i < args.length; i++) {
+			stmt.setObject(i + 1, args[i]);
+		}
+	}
+
+	public static <T> List<T> rows(Class<T> resultType, ResultSet rs) throws SQLException {
+		List<T> rows = U.list();
+
+		ResultSetMetaData meta = rs.getMetaData();
+		int columnsN = meta.getColumnCount();
+		Prop[] props = new Prop[columnsN];
+
+		for (int i = 0; i < props.length; i++) {
+			String name = meta.getColumnLabel(i + 1);
+			props[i] = Beany.property(resultType, name, true);
+		}
+
+		while (rs.next()) {
+			T row = Cls.newInstance(resultType);
+
+			for (int i = 0; i < columnsN; i++) {
+				Object value = rs.getObject(i + 1); // 1-indexed
+				props[i].set(row, value);
+			}
+
+			rows.add(row);
+		}
+
+		return rows;
 	}
 
 	public static List<Map<String, Object>> rows(ResultSet rs) throws SQLException {
@@ -147,8 +180,9 @@ public class JDBC extends RapidoidThing {
 		int columnsNumber = meta.getColumnCount();
 
 		for (int i = 1; i <= columnsNumber; i++) {
-			Object obj = rs.getObject(i);
-			row.put(meta.getColumnLabel(i), obj);
+			String name = meta.getColumnLabel(i);
+			Object value = rs.getObject(i);
+			row.put(name, value);
 		}
 
 		return row;

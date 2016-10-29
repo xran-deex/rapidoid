@@ -24,14 +24,13 @@ import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Run;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.http.IntegrationTestCommons;
+import org.rapidoid.http.IsolatedIntegrationTest;
 import org.rapidoid.setup.App;
 import org.rapidoid.setup.On;
-import org.rapidoid.web.Rapidoid;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class HttpRecursiveMainEntryTest extends IntegrationTestCommons {
+public class HttpRecursiveMainEntryTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void testSequentialControllerRegistration() {
@@ -50,7 +49,7 @@ public class HttpRecursiveMainEntryTest extends IntegrationTestCommons {
 @Run
 class EntryPoint1 {
 	public static void main(String[] args) {
-		Rapidoid.run();
+		App.bootstrap();
 		On.get("/b").plain("B");
 	}
 }

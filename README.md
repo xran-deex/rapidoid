@@ -1,7 +1,7 @@
 Rapidoid - Simple. Powerful. Secure. Fast!
 ========
 
-# Documentation (examples)
+# Documentation, examples, community support
 
 Please visit the official site:
 
@@ -9,16 +9,14 @@ Please visit the official site:
 
 # Apache License v2
 
-The main distribution of the framework is released under the liberal Apache Public License v2, so it is free to use for both commercial and non-commercial projects.
+Rapidoid is released under the liberal Apache Public License v2, so it is free to use for both commercial and non-commercial projects.
 
 # Roadmap
 
 * Better documentation
-* URL pattern support
+* Maven plugin for easy deployment
+* Built-in cache
 * SSL support
-* Hot reloading of changed classes
-* Management/admin app for the server
-* Refactor the configuration components
 
 # Contributing
 

@@ -5,8 +5,8 @@ import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.cls.Cls;
 import org.rapidoid.commons.English;
-import org.rapidoid.commons.IRange;
-import org.rapidoid.commons.Range;
+import org.rapidoid.datamodel.IRange;
+import org.rapidoid.datamodel.Range;
 import org.rapidoid.commons.Str;
 import org.rapidoid.gui.Btn;
 import org.rapidoid.gui.GUI;
@@ -307,10 +307,6 @@ public class X extends RapidoidThing {
 		setup.page(baseUri + "/add").tx().mvc(X.add(entityType, baseUri));
 		setup.page(baseUri + "/{id}/view").tx().mvc(X.view(entityType, baseUri));
 		setup.page(baseUri + "/{id}/edit").tx().mvc(X.edit(entityType, baseUri));
-	}
-
-	public static ProxyHandler proxy(String targetHost) {
-		return new ProxyHandler(targetHost);
 	}
 
 }

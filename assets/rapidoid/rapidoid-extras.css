@@ -1,4 +1,8 @@
-/* Rapidoid Extras */
+/*!
+ * Rapidoid Extras
+ * Author: Nikolche Mihajlovski
+ * Licence: MIT
+ */
 
 /***** Social button fixes */
 #twitter-widget-0, .g-plusone {
@@ -12,6 +16,13 @@
 	font-size: 12px;
 	line-height: 1.5;
 	border-radius: 3px;
+}
+
+/***** Text box */
+.text-box {
+	padding: 1px 3px;
+	border: #aaa solid 1px !important;
+	border-radius: 5px;
 }
 
 /***** Default Gmap dimensions */

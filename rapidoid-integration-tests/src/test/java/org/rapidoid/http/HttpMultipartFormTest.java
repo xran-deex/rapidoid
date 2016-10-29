@@ -33,7 +33,7 @@ import java.util.Map;
 
 @Authors("Nikolche Mihajlovski")
 @Since("2.0.0")
-public class HttpMultipartFormTest extends IntegrationTestCommons {
+public class HttpMultipartFormTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void shouldHandleUploads() throws Throwable {
@@ -51,10 +51,10 @@ public class HttpMultipartFormTest extends IntegrationTestCommons {
 		HttpClient client = HTTP.client().host(LOCALHOST).cookie("foo", "bar");
 
 		String res = client.post(localhost("/upload"))
-				.header("Cookie", "COOKIE1=a")
-				.data("a", "bb")
-				.files(files)
-				.fetch();
+			.header("Cookie", "COOKIE1=a")
+			.data("a", "bb")
+			.files(files)
+			.fetch();
 
 		eq(res, "bar:a:bb:2:" + U.join(":", hash1, hash2, hash3));
 
@@ -80,9 +80,9 @@ public class HttpMultipartFormTest extends IntegrationTestCommons {
 		HttpClient client = HTTP.client().host(LOCALHOST).cookies(cookies);
 
 		String res = client.post(localhost("/upload"))
-				.data("a", "d")
-				.files(files)
-				.fetch();
+			.data("a", "d")
+			.files(files)
+			.fetch();
 
 		eq(res, "bar:a:d:3:" + U.join(":", hash1, hash2, hash3));
 

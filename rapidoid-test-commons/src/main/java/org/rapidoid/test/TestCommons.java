@@ -30,6 +30,8 @@ import org.mockito.stubbing.OngoingStubbing;
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
@@ -60,7 +62,7 @@ public abstract class TestCommons {
 	}
 
 	@Before
-	public void init() {
+	public final void initTest() {
 		System.out.println("--------------------------------------------------------------------------------");
 		System.out.println(" @" + ManagementFactory.getRuntimeMXBean().getName() + " TEST " + getClass().getCanonicalName());
 		System.out.println("--------------------------------------------------------------------------------");
@@ -501,6 +503,19 @@ public abstract class TestCommons {
 		return file;
 	}
 
+	protected String createTempDir(String name) {
+		Path tmpDir = null;
+		try {
+			tmpDir = Files.createTempDirectory(name);
+		} catch (IOException e) {
+			throw new RuntimeException("Couldn't create temporary directory!", e);
+		}
+
+		String tmpPath = tmpDir.toAbsolutePath().toString();
+		tmpDir.toFile().deleteOnExit();
+		return tmpPath;
+	}
+
 	protected String getTestName() {
 		return getClass().getSimpleName();
 	}
@@ -528,19 +543,31 @@ public abstract class TestCommons {
 		return a == null ? b == null : a.equals(b);
 	}
 
-	protected void check(String desc, String actual, String expected) {
+	protected boolean httpResultsMatch(String actual, String expected) {
+		return isEq(platformNeutral(actual), platformNeutral(expected));
+	}
+
+	private String platformNeutral(String httpResponse) {
 		if (OS.contains("win")) {
+
 			// remove carriage returns to make tests platform independent
-			actual = actual.replaceAll("(\\r)", "");
-			expected = expected.replaceAll("(\\r)", "");
-			// remove the content length line to make tests pass on any platform 
-			actual = actual.replaceAll("Content-Length:([0-9\\n ]+)", "");
-			expected = expected.replaceAll("Content-Length:([0-9\\n ]+)", "");
+			httpResponse = httpResponse.replaceAll("(\\r)", "");
+
+			// remove the content length line to make tests pass on any platform
+			httpResponse = httpResponse.replaceAll("Content-Length:([0-9\\n ]+)", "");
 		}
+
+		return httpResponse;
+	}
+
+	protected void check(String desc, String actual, String expected) {
+		actual = platformNeutral(actual);
+		expected = platformNeutral(expected);
 
 		if (!isEq(actual, expected)) {
 			System.out.println("FAILURE: " + desc);
 		}
+
 		eq(actual, expected);
 	}
 

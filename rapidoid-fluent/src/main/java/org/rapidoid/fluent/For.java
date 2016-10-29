@@ -30,6 +30,12 @@ import java.util.stream.Stream;
  */
 public class For {
 
+	@SafeVarargs
+	@SuppressWarnings("unchecked")
+	public static <T> ForEach<T> each(T... items) {
+		return new ForEach<T>(Do.streamOf(items));
+	}
+
 	public static <T> ForEach<T> each(Iterable<T> items) {
 		return new ForEach<T>(Do.stream(items));
 	}

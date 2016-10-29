@@ -22,9 +22,10 @@ package org.rapidoid.http.handler;
 
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.http.MediaType;
 import org.rapidoid.http.HttpStatus;
 import org.rapidoid.http.Req;
+import org.rapidoid.http.Route;
 import org.rapidoid.http.impl.RouteOptions;
 import org.rapidoid.http.impl.HandlerMatch;
 import org.rapidoid.net.abstracts.Channel;
@@ -40,5 +41,7 @@ public interface HttpHandler extends HandlerMatch {
 	MediaType contentType();
 
 	RouteOptions options();
+
+	void setRoute(Route route);
 
 }

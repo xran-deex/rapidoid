@@ -23,17 +23,18 @@ package org.rapidoid.http;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.io.Res;
 import org.rapidoid.setup.On;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.0.11")
-public class HttpStaticFilesTest extends IntegrationTestCommons {
+public class HttpStaticFilesTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void serveStaticFiles() {
 		On.custom().staticFilesPath("static1", "non-existing-location", "static2");
 
-		On.get("/c").staticJson("override".getBytes());
+		On.get("/c").managed(false).contentType(MediaType.JSON).serve("override");
 
 		onlyGet("/"); // home page
 		onlyGet("/index"); // home page
@@ -44,6 +45,17 @@ public class HttpStaticFilesTest extends IntegrationTestCommons {
 
 		onlyGet("/b");
 		onlyGet("/c");
+
+		onlyGet("/dir1/sub1.txt");
+
+		// no private files (starting with '.')
+		notFound("/dir1/.sub2.txt");
+		notFound("/.priv.txt");
+
+		// no folders
+		Res dir1 = Res.from("dir1", "static2");
+		isFalse(dir1.exists());
+		notFound("/dir1");
 
 		notFound("/xx");
 		notFound("/page1");

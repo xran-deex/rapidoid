@@ -36,6 +36,8 @@ import java.util.Map;
 @Since("5.1.0")
 public class ConfigUtil extends RapidoidThing {
 
+	public static final String YML_OR_YAML = ".yml_or_yaml";
+
 	private static final ConfigParser YAML_PARSER = new ConfigParser() {
 		@SuppressWarnings("unchecked")
 		@Override
@@ -51,7 +53,7 @@ public class ConfigUtil extends RapidoidThing {
 	}
 
 	public static synchronized void autoRefresh(final Config config, final String filename, final ConfigParser parser) {
-		Log.debug("Initializing auto-refreshing config", "filename", filename);
+		Log.info("Initializing auto-refreshing config", "filename", filename);
 
 		final Res res = Res.from(filename);
 		tracking.put(config.keys(), res);
@@ -94,37 +96,57 @@ public class ConfigUtil extends RapidoidThing {
 		return keys;
 	}
 
-	static synchronized void load(String filename, Config config, boolean overridenByEnv) {
-		byte[] bytes = tryToLoad(filename, config);
+	static synchronized void load(String filename, Config config, List<String> loaded) {
+		byte[] bytes = tryToLoad(filename, loaded);
 
 		if (bytes != null) {
 			if (bytes.length > 0) {
 				Map<String, Object> configData = U.safe(YAML_PARSER.parse(bytes));
 				Log.debug("Loading configuration file", "filename", filename);
-				config.update(configData, overridenByEnv);
+				config.update(configData);
 			}
+
 		} else {
 			Log.trace("Couldn't find configuration file", "filename", filename);
 		}
 
 	}
 
-	private static byte[] tryToLoad(String filename, Config config) {
-		if (filename.endsWith(".y?ml")) {
+	private static byte[] tryToLoad(String filename, List<String> loaded) {
+		Res res = findConfigResource(filename);
+
+		if (res.exists()) {
+			loaded.add(res.getCachedFileName());
+		}
+
+		return res.getBytesOrNull();
+	}
+
+	private static Res findConfigResource(String filename) {
+		if (filename.endsWith(YML_OR_YAML)) {
+
 			// flexible extension: YML or YAML
-			String basename = Str.trimr(filename, ".y?ml");
+			String basename = Str.trimr(filename, YML_OR_YAML);
 
-			byte[] bytes = Res.from(basename + ".yaml").getBytesOrNull();
+			Res res = Res.from(basename + ".yaml");
 
-			if (bytes != null) {
-				return bytes;
+			if (res.exists()) {
+				return res;
 			} else {
-				return Res.from(basename + ".yml").getBytesOrNull();
+				return Res.from(basename + ".yml");
 			}
 
 		} else {
-			return Res.from(filename).getBytesOrNull();
+			return Res.from(filename);
 		}
+	}
+
+	public static synchronized int cpus() {
+		return Conf.ROOT.entry("cpus").or(Runtime.getRuntime().availableProcessors());
+	}
+
+	public static synchronized boolean micro() {
+		return Conf.ROOT.is("micro");
 	}
 
 }

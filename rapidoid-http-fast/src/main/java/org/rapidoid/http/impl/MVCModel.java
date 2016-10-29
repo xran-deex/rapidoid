@@ -20,7 +20,6 @@ package org.rapidoid.http.impl;
  * #L%
  */
 
-import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.http.Req;
@@ -31,34 +30,16 @@ import java.util.Map;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class MVCModel extends RapidoidThing {
+public interface MVCModel {
 
-	public final Req req;
+	Req req();
 
-	public final Resp resp;
+	Resp resp();
 
-	public final Map<String, Object> model;
+	Map<String, Object> model();
 
-	public final Screen screen;
+	Screen screen();
 
-	public final Object result;
+	Object result();
 
-	public MVCModel(Req req, Resp resp, Map<String, Object> model, Screen screen, Object result) {
-		this.req = req;
-		this.resp = resp;
-		this.model = model;
-		this.screen = screen;
-		this.result = result;
-	}
-
-	@Override
-	public String toString() {
-		return "{" +
-				"req=" + req +
-				", resp=" + resp +
-				", model=" + model +
-				", screen=" + screen +
-				", result=" + result +
-				'}';
-	}
 }

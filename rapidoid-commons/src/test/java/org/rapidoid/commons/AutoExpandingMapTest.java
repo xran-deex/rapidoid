@@ -23,6 +23,7 @@ package org.rapidoid.commons;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.lambda.Mapper;
 import org.rapidoid.test.AbstractCommonsTest;
 import org.rapidoid.u.U;
@@ -35,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Since("5.0.4")
 public class AutoExpandingMapTest extends AbstractCommonsTest {
 
-	@Test
+	@Test(timeout = 60000)
 	public void testConcurrentMapAccess() {
 		final AtomicInteger counter = new AtomicInteger();
 		final Map<Object, Object> map = autoToStr(counter);

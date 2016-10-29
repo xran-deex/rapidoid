@@ -33,13 +33,13 @@ import org.rapidoid.u.U;
 @Since("5.1.0")
 public class RouteImpl extends RapidoidThing implements Route {
 
-	private HttpVerb verb;
+	private volatile HttpVerb verb;
 
-	private String path;
+	private volatile String path;
 
-	private HttpHandler handler;
+	private volatile HttpHandler handler;
 
-	private RouteOptions options;
+	private volatile RouteOptions options;
 
 	public RouteImpl(HttpVerb verb, String path, HttpHandler handler, RouteOptions options) {
 		this.verb = verb;
@@ -81,7 +81,7 @@ public class RouteImpl extends RapidoidThing implements Route {
 
 	@Override
 	public String toString() {
-		return U.frmt("Route %s %s [segment %s] roles %s : %s", verb, path, config().segment(), config().roles(), handler);
+		return U.frmt("Route %s %s [zone %s] roles %s : %s", verb, path, config().zone(), config().roles(), handler);
 	}
 
 	@Override
@@ -90,4 +90,10 @@ public class RouteImpl extends RapidoidThing implements Route {
 		result = 31 * result + path.hashCode();
 		return result;
 	}
+
+	public RouteImpl handler(HttpHandler handler) {
+		this.handler = handler;
+		return this;
+	}
+
 }

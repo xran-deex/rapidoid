@@ -1,9 +1,8 @@
 package org.rapidoid.io.watch;
 
-import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.config.RapidoidInitializer;
 import org.rapidoid.io.Res;
 import org.rapidoid.lambda.Mapper;
@@ -42,11 +41,7 @@ import java.util.concurrent.TimeUnit;
 
 @Authors("Nikolche Mihajlovski")
 @Since("4.1.0")
-public class Dir extends RapidoidThing implements FilesystemChangeListener {
-
-	static {
-		RapidoidInitializer.initialize();
-	}
+public class Dir extends RapidoidInitializer implements FilesystemChangeListener {
 
 	private static final ScheduledExecutorService EXECUTORS = Executors.newScheduledThreadPool(8);
 

@@ -10,7 +10,7 @@
 
 	<groupId>org.rapidoid</groupId>
 	<artifactId>rapidoid</artifactId>
-	<version>5.1.10-SNAPSHOT</version>
+	<version>5.2.6-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>Rapidoid</name>
@@ -47,10 +47,13 @@
 	</scm>
 
 	<properties>
-		<java.version>1.6</java.version>
+		<java.version>1.7</java.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<test.jvm.argLine>-server -verbose:gc</test.jvm.argLine>
+
+		<timestamp>${maven.build.timestamp}</timestamp>
+		<maven.build.timestamp.format>yyyy-MM-dd HH:mm z</maven.build.timestamp.format>
 
 		<jackson.version>2.6.6</jackson.version>
 		<javassist.version>3.20.0-GA</javassist.version>
@@ -71,10 +74,12 @@
 		<mysql-connector.version>5.1.38</mysql-connector.version>
 		<h2.version>1.4.187</h2.version>
 		<hsqldb.version>2.3.3</hsqldb.version>
+		<postgresql-version>9.4.1211</postgresql-version>
 
 		<spring.version>4.2.5.RELEASE</spring.version>
 		<oltu.version>1.0.1</oltu.version>
 		<mustache.java.version>0.9.1</mustache.java.version>
+		<jmustache.version>1.12</jmustache.version>
 
 		<junit.version>4.12</junit.version>
 		<mockito.version>1.8.5</mockito.version>
@@ -98,7 +103,7 @@
 		<module>rapidoid-oauth</module>
 		<module>rapidoid-integrate</module>
 		<module>rapidoid-web</module>
-		<module>rapidoid-standalone</module>
+		<module>rapidoid-platform</module>
 		<module>rapidoid-quick</module>
 		<module>rapidoid-watch</module>
 		<module>rapidoid-fluent</module>

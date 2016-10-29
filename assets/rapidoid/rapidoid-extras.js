@@ -1,5 +1,13 @@
-/* Rapidoid Extras */
-Rapidoid = (function() {
+/*!
+ * Rapidoid Extras
+ * Author: Nikolche Mihajlovski
+ * Licence: MIT
+ */
+window.Rapidoid = window.Rapidoid || {};
+
+(function() {
+
+    var Rapidoid = window.Rapidoid;
 
     // var theme;
     // try {
@@ -81,7 +89,7 @@ Rapidoid = (function() {
 
     function _logout() {
         $.removeCookie('JSESSIONID', '/', '');
-        $.removeCookie('COOKIEPACK', '/', '');
+        $.removeCookie('_token', '/', '');
         location.reload();
     }
 
@@ -180,27 +188,25 @@ Rapidoid = (function() {
         Rapidoid.scope.$apply();
     }
 
-    return {
-        goAt : _goAt,
-        setTheme : _setTheme,
-        appendScript : _appendScript,
-        logout : _logout,
-        popup : _popup,
-        modal : _modal,
-        init : _init,
-        initialized : false,
-        setHtml : setHtml,
+    Rapidoid.goAt = _goAt;
+    Rapidoid.setTheme = _setTheme;
+    Rapidoid.appendScript = _appendScript;
+    Rapidoid.logout = _logout;
+    Rapidoid.popup = _popup;
+    Rapidoid.modal = _modal;
+    Rapidoid.init = _init;
+    Rapidoid.initialized = false;
+    Rapidoid.setHtml = setHtml;
 
-        createApp : createApp,
-        initializer : initializer,
-        plugin : plugin,
-        initApp : initApp,
-        holder: 'ajaxBodyContent'
-    };
+    Rapidoid.createApp = createApp;
+    Rapidoid.initializer = initializer;
+    Rapidoid.plugin = plugin;
+    Rapidoid.initApp = initApp;
+    Rapidoid.holder= 'ajaxBodyContent';
 
 })();
 
-$R = (function() {
+window.$R = (function() {
 
     function get(url, onDone) {
         return $.get(url).done(onDone).fail(function(data) {

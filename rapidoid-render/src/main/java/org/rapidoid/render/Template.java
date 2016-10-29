@@ -29,8 +29,10 @@ import java.io.OutputStream;
 @Since("5.1.0")
 public interface Template {
 
-	void renderTo(OutputStream output, Object... scopes);
+	void renderTo(OutputStream output, Object model);
 
-	String render(Object... scopes);
+	byte[] renderToBytes(Object model);
+
+	String render(Object model);
 
 }

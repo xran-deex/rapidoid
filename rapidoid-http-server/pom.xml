@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.rapidoid</groupId>
 		<artifactId>rapidoid</artifactId>
-		<version>5.1.10-SNAPSHOT</version>
+		<version>5.2.6-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>rapidoid-http-server</artifactId>
@@ -36,6 +36,12 @@
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>${junit.version}</version>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.hibernate</groupId>
+			<artifactId>hibernate-entitymanager</artifactId>
+			<version>${hibernate.version}</version>
 			<optional>true</optional>
 		</dependency>
 

@@ -95,13 +95,13 @@ public class JdbcClient extends RapidoidThing {
 		try {
 			Class.forName(driver);
 		} catch (ClassNotFoundException e) {
-			throw new RuntimeException("Cannot find JDBC driver class: " + driver);
+			throw U.rte("Cannot find JDBC driver class: " + driver);
 		}
 	}
 
 	private void validateArgNotNull(String argName, String argValue) {
 		if (argValue == null) {
-			throw new RuntimeException("The JDBC parameter '" + argName + "' must be configured!");
+			throw U.rte("The JDBC parameter '" + argName + "' must be configured!");
 		}
 	}
 
@@ -111,8 +111,7 @@ public class JdbcClient extends RapidoidThing {
 			registerJDBCDriver();
 
 			String maskedPassword = U.isEmpty(password) ? "<empty>" : "<specified>";
-			Log.info("Initialized the default JDBC API", "!url", url, "!driver", driver, "!username", username,
-					"!password", maskedPassword);
+			Log.info("Initialized JDBC API", "!url", url, "!driver", driver, "!username", username, "!password", maskedPassword);
 
 			initialized = true;
 		}
@@ -133,28 +132,28 @@ public class JdbcClient extends RapidoidThing {
 
 	private static void close(Connection conn) {
 		try {
-			if (conn != null)
-				conn.close();
+			if (conn != null) conn.close();
+
 		} catch (SQLException e) {
-			throw new RuntimeException("Error occured while closing the connection!", e);
+			throw U.rte("Error occurred while closing the connection!", e);
 		}
 	}
 
 	private static void close(PreparedStatement stmt) {
 		try {
-			if (stmt != null)
-				stmt.close();
+			if (stmt != null) stmt.close();
+
 		} catch (SQLException e) {
-			throw new RuntimeException("Error occured while closing the statement!", e);
+			throw U.rte("Error occurred while closing the statement!", e);
 		}
 	}
 
 	private static void close(ResultSet rs) {
 		try {
-			if (rs != null)
-				rs.close();
+			if (rs != null) rs.close();
+
 		} catch (SQLException e) {
-			throw new RuntimeException("Error occured while closing the ResultSet!", e);
+			throw U.rte("Error occurred while closing the ResultSet!", e);
 		}
 	}
 
@@ -167,8 +166,10 @@ public class JdbcClient extends RapidoidThing {
 		try {
 			stmt = JDBC.prepare(conn, sql, args);
 			stmt.execute();
+
 		} catch (SQLException e) {
-			throw new RuntimeException(e);
+			throw U.rte(e);
+
 		} finally {
 			close(stmt);
 			close(conn);
@@ -178,13 +179,14 @@ public class JdbcClient extends RapidoidThing {
 	public void tryToExecute(String sql, Object... args) {
 		try {
 			execute(sql, args);
+
 		} catch (Exception e) {
 			// ignore the exception
 			Log.warn("Ignoring exception", "error", U.safe(e.getMessage()));
 		}
 	}
 
-	public <T> List<Map<String, Object>> query(String sql, Object... args) {
+	public <T> List<T> query(Class<T> resultType, String sql, Object... args) {
 		ensureIsInitialized();
 
 		Connection conn = provideConnection();
@@ -194,16 +196,25 @@ public class JdbcClient extends RapidoidThing {
 		try {
 			stmt = JDBC.prepare(conn, sql, args);
 			rs = stmt.executeQuery();
-			return JDBC.rows(rs);
+
+			if (resultType.equals(Map.class)) {
+				return U.cast(JDBC.rows(rs));
+			} else {
+				return JDBC.rows(resultType, rs);
+			}
 
 		} catch (SQLException e) {
-			throw new RuntimeException(e);
+			throw U.rte(e);
 
 		} finally {
 			close(rs);
 			close(stmt);
 			close(conn);
 		}
+	}
+
+	public List<Map<String, Object>> query(String sql, Object... args) {
+		return U.cast(query(Map.class, sql, args));
 	}
 
 	private Connection provideConnection() {
@@ -228,7 +239,7 @@ public class JdbcClient extends RapidoidThing {
 			return conn;
 
 		} catch (SQLException e) {
-			throw new RuntimeException("Cannot create JDBC connection!", e);
+			throw U.rte("Cannot create JDBC connection!", e);
 		}
 	}
 

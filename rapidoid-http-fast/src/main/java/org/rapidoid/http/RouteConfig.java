@@ -3,7 +3,6 @@ package org.rapidoid.http;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.annotation.TransactionMode;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.http.impl.RouteOptions;
 
 import java.util.Set;
@@ -54,9 +53,14 @@ public interface RouteConfig {
 
 	HttpWrapper[] wrappers();
 
-	RouteOptions wrap(HttpWrapper... wrappers);
+	RouteOptions wrappers(HttpWrapper... wrappers);
 
-	String segment();
+	String zone();
 
-	RouteOptions segment(String segment);
+	RouteOptions zone(String zone);
+
+	boolean managed();
+
+	RouteOptions managed(boolean managed);
+
 }

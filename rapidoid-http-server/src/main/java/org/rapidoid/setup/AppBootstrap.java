@@ -27,46 +27,179 @@ import org.rapidoid.cls.Cls;
 import org.rapidoid.jpa.JPA;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
-import org.rapidoid.util.Once;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
 public class AppBootstrap extends RapidoidThing {
 
-	private static final Once jpa = new Once();
-	private static final Once adminCenter = new Once();
-	private static final Once auth = new Once();
-
-	public AppBootstrap jpa() {
-		if (!jpa.go()) return this;
-
-		if (Msc.hasJPA()) {
-			JPA.bootstrap(App.path());
+	private static final ServiceBootstrap services = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			ServiceActivator.activateServices();
 		}
+	};
 
+	private static final ServiceBootstrap jpa = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			if (Msc.hasJPA()) {
+				JPA.bootstrap(App.path());
+			}
+		}
+	};
+
+	private static final ServiceBootstrap ping = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().ping(On.setup());
+		}
+	};
+
+	private static final ServiceBootstrap auth = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().auth(On.setup());
+		}
+	};
+
+	private static final ServiceBootstrap oauth = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().oauth(On.setup());
+		}
+	};
+
+	private static final ServiceBootstrap entities = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().entities(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap overview = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().overview(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap application = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().application(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap lifecycle = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().lifecycle(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap jmx = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().jmx(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap metrics = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().metrics(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap deploy = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().deploy(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap status = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().status(Admin.setup());
+		}
+	};
+
+	private static final ServiceBootstrap adminCenter = new ServiceBootstrap() {
+		@Override
+		protected void bootstrap() {
+			getGoodies().adminCenter(Admin.setup());
+		}
+	};
+
+	AppBootstrap services() {
+		services.run();
 		return this;
 	}
 
-	public AppBootstrap adminCenter() {
-		if (!adminCenter.go()) return this;
+	public AppBootstrap jpa() {
+		jpa.run();
+		return this;
+	}
 
-		getGoodies().adminCenter(Admin.setup());
+	public AppBootstrap overview() {
+		overview.run();
+		return this;
+	}
 
+	public AppBootstrap application() {
+		application.run();
+		return this;
+	}
+
+	public AppBootstrap lifecycle() {
+		lifecycle.run();
+		return this;
+	}
+
+	public AppBootstrap jmx() {
+		jmx.run();
+		return this;
+	}
+
+	public AppBootstrap metrics() {
+		metrics.run();
+		return this;
+	}
+
+	public AppBootstrap deploy() {
+		deploy.run();
+		return this;
+	}
+
+	public AppBootstrap status() {
+		status.run();
+		return this;
+	}
+
+	public AppBootstrap ping() {
+		ping.run();
 		return this;
 	}
 
 	public AppBootstrap auth() {
-		if (!auth.go()) return this;
-
-		getGoodies().auth(On.setup());
-
+		auth.run();
 		return this;
 	}
 
-	private IGoodies getGoodies() {
-		Class<?> goodiesClass = Cls.getClassIfExists("org.rapidoid.goodies.RapidoidGoodies");
+	public AppBootstrap oauth() {
+		oauth.run();
+		return this;
+	}
 
-		U.must(goodiesClass != null, "Cannot find the Goodies, is the rapidoid-web module missing?");
+	public AppBootstrap adminCenter() {
+		adminCenter.run();
+		return this;
+	}
+
+	static IGoodies getGoodies() {
+		Class<?> goodiesClass = Cls.getClassIfExists("org.rapidoid.goodies.RapidoidGoodies");
+		U.must(goodiesClass != null, "Cannot find the Goodies, is module 'rapidoid-web' missing?");
 
 		return (IGoodies) Cls.newInstance(goodiesClass);
 	}
@@ -75,11 +208,23 @@ public class AppBootstrap extends RapidoidThing {
 		jpa();
 		adminCenter();
 		auth();
+		oauth();
 	}
 
 	static void reset() {
+		services.reset();
 		jpa.reset();
+		entities.reset();
+		overview.reset();
+		application.reset();
+		lifecycle.reset();
+		jmx.reset();
+		metrics.reset();
+		deploy.reset();
+		status.reset();
+		ping.reset();
 		auth.reset();
+		oauth.reset();
 		adminCenter.reset();
 	}
 

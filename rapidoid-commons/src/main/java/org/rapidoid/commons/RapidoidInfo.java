@@ -3,10 +3,14 @@ package org.rapidoid.commons;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.config.RapidoidInitializer;
 import org.rapidoid.u.U;
+import org.rapidoid.util.GlobalCfg;
+import org.rapidoid.util.Msc;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Properties;
 
 /*
@@ -36,6 +40,7 @@ public class RapidoidInfo extends RapidoidThing {
 	private static final Properties PROPS = new Properties();
 
 	private static final String VERSION;
+	private static final String BUILT_ON;
 
 	static {
 		try {
@@ -48,10 +53,35 @@ public class RapidoidInfo extends RapidoidThing {
 		}
 
 		VERSION = PROPS.getProperty("version");
+		BUILT_ON = PROPS.getProperty("built-on");
 	}
 
 	public static String version() {
 		return VERSION;
+	}
+
+	public static String builtOn() {
+		return BUILT_ON;
+	}
+
+	public static List<String> notes() {
+		List<String> notes = U.list();
+
+		if (Msc.dockerized()) notes.add("Dockerized");
+		if (GlobalCfg.uniformOutput()) notes.add("Uniform output");
+
+		return notes;
+	}
+
+	public static String nameAndInfo() {
+		String info = U.frmt("v%s, built on %s", Msc.maybeMasked(version()), Msc.maybeMasked(builtOn()));
+		String notes = Str.render(notes(), " [%s]", "");
+
+		return "Rapidoid " + info + notes;
+	}
+
+	public static long uptime() {
+		return U.time() - RapidoidInitializer.startedOn();
 	}
 
 }

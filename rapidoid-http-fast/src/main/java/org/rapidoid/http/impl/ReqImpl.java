@@ -5,22 +5,29 @@ import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.buffer.Buf;
 import org.rapidoid.cls.Cls;
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.collection.ChangeTrackingMap;
+import org.rapidoid.collection.Coll;
+import org.rapidoid.http.MediaType;
 import org.rapidoid.commons.Str;
 import org.rapidoid.http.*;
 import org.rapidoid.http.customize.BeanParameterFactory;
 import org.rapidoid.http.customize.Customization;
+import org.rapidoid.http.customize.JsonRequestBodyParser;
+import org.rapidoid.http.customize.SessionManager;
 import org.rapidoid.io.Upload;
 import org.rapidoid.log.Log;
+import org.rapidoid.log.LogLevel;
 import org.rapidoid.net.abstracts.Channel;
 import org.rapidoid.net.abstracts.IRequest;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Constants;
 import org.rapidoid.util.Msc;
 
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /*
  * #%L
@@ -62,7 +69,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	private volatile String query;
 
-	private volatile String segment;
+	private volatile String zone;
 
 	private volatile String contextPath;
 
@@ -82,7 +89,15 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	private volatile Map<String, Object> data;
 
-	private volatile Map<String, Serializable> cookiepack;
+	private volatile ChangeTrackingMap<String, Serializable> token;
+
+	final AtomicBoolean tokenChanged = new AtomicBoolean();
+
+	private volatile TokenStatus tokenStatus = TokenStatus.PENDING;
+
+	private volatile ChangeTrackingMap<String, Serializable> session;
+
+	final AtomicBoolean sessionChanged = new AtomicBoolean();
 
 	private volatile RespImpl response;
 
@@ -98,14 +113,21 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	private volatile boolean completed;
 
+	private volatile boolean pendingBodyParsing;
+
 	private final MediaType defaultContentType;
 
 	private volatile HttpRoutesImpl routes;
 
+	private final Route route;
+
+	private volatile Customization custom;
+
 	public ReqImpl(FastHttp http, Channel channel, boolean isKeepAlive, String verb, String uri, String path,
 	               String query, byte[] body, Map<String, String> params, Map<String, String> headers,
 	               Map<String, String> cookies, Map<String, Object> posted, Map<String, List<Upload>> files,
-	               MediaType defaultContentType, String segment, HttpRoutesImpl routes) {
+	               boolean pendingBodyParsing, MediaType defaultContentType, String zone,
+	               HttpRoutesImpl routes, Route route) {
 
 		this.http = http;
 		this.channel = channel;
@@ -120,9 +142,12 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 		this.cookies = cookies;
 		this.posted = posted;
 		this.files = files;
+		this.pendingBodyParsing = pendingBodyParsing;
 		this.defaultContentType = defaultContentType;
-		this.segment = segment;
+		this.zone = zone;
 		this.routes = routes;
+		this.route = route;
+		this.custom = routes != null ? routes.custom() : http.custom();
 	}
 
 	@Override
@@ -192,6 +217,15 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	@Override
 	public Map<String, Object> posted() {
+		if (pendingBodyParsing) {
+			synchronized (this) {
+				if (pendingBodyParsing) {
+					pendingBodyParsing = false;
+					parseJsonBody();
+				}
+			}
+		}
+
 		return posted;
 	}
 
@@ -299,7 +333,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 					allData.putAll(params);
 					allData.putAll(files);
-					allData.putAll(posted);
+					allData.putAll(posted());
 
 					data = Collections.unmodifiableMap(allData);
 				}
@@ -399,8 +433,12 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 	private void startResponse(int code, boolean unknownContentLength) {
 		MediaType contentType = MediaType.HTML_UTF_8;
 
-		if (cookiepack != null) {
-			HttpUtils.saveCookipackBeforeRenderingHeaders(this, cookiepack);
+		if (tokenChanged.get()) {
+			HttpUtils.saveTokenBeforeRenderingHeaders(this, token);
+		}
+
+		if (sessionChanged.get()) {
+			saveSession(session.decorated());
 		}
 
 		if (response != null) {
@@ -515,7 +553,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 			return response.renderToBytes();
 
 		} catch (Throwable e) {
-			HttpIO.error(this, e, custom().errorHandler());
+			HttpIO.error(this, e, LogLevel.ERROR);
 
 			try {
 				return response.renderToBytes();
@@ -533,7 +571,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 		}
 
 		if (response.result() == null && response.body() == null && response.redirect() == null
-				&& response.file() == null && response.raw() == null && !response().mvc()) {
+			&& response.file() == null && response.raw() == null && !response().mvc()) {
 			return "Response content wasn't provided!";
 		}
 
@@ -571,17 +609,24 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	public ReqImpl routes(HttpRoutesImpl routes) {
 		this.routes = routes;
+		this.custom = routes != null ? routes.custom() : http.custom();
 		return this;
 	}
 
 	@Override
+	public Route route() {
+		return route;
+	}
+
+	@Override
 	public Customization custom() {
-		return routes.custom();
+		return custom;
 	}
 
 	@Override
 	public Req async() {
 		this.async = true;
+		channel.async();
 		return this;
 	}
 
@@ -601,7 +646,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 			synchronized (cookies) {
 				if (cookie(SESSION_COOKIE, null) == null) {
 					cookies.put(SESSION_COOKIE, sessionId);
-					response().cookie(SESSION_COOKIE, sessionId, "path=/", "HttpOnly");
+					response().cookie(SESSION_COOKIE, sessionId, "HttpOnly");
 				}
 			}
 		}
@@ -616,7 +661,15 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 
 	@Override
 	public Map<String, Serializable> session() {
-		return http.session(sessionId());
+		if (session == null) {
+			synchronized (this) {
+				if (session == null) {
+					session = Coll.trackChanges(loadSession(), sessionChanged);
+				}
+			}
+		}
+
+		return session;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -632,55 +685,69 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 		return withDefault(value, defaultValue);
 	}
 
-	/* COOKIEPACK: */
+	/* TOKEN: */
 
 	@Override
-	public boolean hasCookiepack() {
-		return U.notEmpty(cookiepack) || cookie(COOKIEPACK, null) != null || data(TOKEN, null) != null;
+	public boolean hasToken() {
+		token(); // try to find and deserialize the token
+		return tokenStatus != TokenStatus.NONE;
 	}
 
 	@Override
-	public Map<String, Serializable> cookiepack() {
-		if (cookiepack == null) {
+	public Map<String, Serializable> token() {
+		if (tokenStatus == TokenStatus.PENDING) {
 			synchronized (this) {
-				if (cookiepack == null) {
-					Map<String, Serializable> cpack = null;
+				if (tokenStatus == TokenStatus.PENDING) {
+
+					Map<String, Serializable> tokenData = null;
 
 					try {
-						cpack = HttpUtils.initAndDeserializeCookiePack(this);
+						tokenData = HttpUtils.initAndDeserializeToken(this);
+
+						tokenStatus(tokenData != null ? TokenStatus.LOADED : TokenStatus.NONE);
+
 					} catch (Exception e) {
-						Log.warn("Cookie-pack deserialization error! Maybe the secret was changed?");
-						Log.debug("Cookie-pack deserialization error!", e);
+						Log.debug("Token deserialization error!", e);
+						tokenStatus(TokenStatus.INVALID);
 					}
 
-					cookiepack = Collections.synchronizedMap(U.safe(cpack));
+					token = Coll.trackChanges(Collections.synchronizedMap(U.safe(tokenData)), tokenChanged);
 				}
 			}
 		}
 
-		return cookiepack;
+		return token;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends Serializable> T cookiepack(String name) {
-		Serializable value = hasCookiepack() ? cookiepack().get(name) : null;
-		return (T) U.notNull(value, "COOKIEPACK[%s]", name);
+	public <T extends Serializable> T token(String name) {
+		Serializable value = hasToken() ? token().get(name) : null;
+		return (T) U.notNull(value, "TOKEN[%s]", name);
 	}
 
 	@Override
-	public <T extends Serializable> T cookiepack(String name, T defaultValue) {
-		Serializable value = hasCookiepack() ? cookiepack().get(name) : null;
+	public <T extends Serializable> T token(String name, T defaultValue) {
+		Serializable value = hasToken() ? token().get(name) : null;
 		return withDefault(value, defaultValue);
 	}
 
-	@Override
-	public String segment() {
-		return segment;
+	public TokenStatus tokenStatus() {
+		return tokenStatus;
 	}
 
-	public Req segment(String segment) {
-		this.segment = segment;
+	public Req tokenStatus(TokenStatus tokenStatus) {
+		this.tokenStatus = tokenStatus;
+		return this;
+	}
+
+	@Override
+	public String zone() {
+		return zone;
+	}
+
+	public Req zone(String zone) {
+		this.zone = zone;
 		return this;
 	}
 
@@ -689,7 +756,7 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 		if (contextPath == null) {
 			synchronized (this) {
 				if (contextPath == null) {
-					contextPath = HttpUtils.getContextPath(custom(), segment());
+					contextPath = HttpUtils.getContextPath(this);
 				}
 			}
 		}
@@ -728,6 +795,71 @@ public class ReqImpl extends RapidoidThing implements Req, Constants, HttpMetada
 	@Override
 	public boolean isStopped() {
 		return stopped;
+	}
+
+	@Override
+	public void revert() {
+		rendering = false;
+		posConLen = 0;
+		posBefore = 0;
+		async = false;
+		done = false;
+		completed = false;
+		response = null;
+	}
+
+	private void parseJsonBody() {
+		if (U.notEmpty(body())) {
+
+			Map<String, ?> jsonData = null;
+			JsonRequestBodyParser parser = custom().jsonRequestBodyParser();
+
+			try {
+				jsonData = parser.parseJsonBody(this, body);
+			} catch (Exception e) {
+				Log.error("The attempt to parse the request body as JSON failed. Please make sure the correct content type is specified in the request header!", e);
+			}
+
+			if (jsonData != null) {
+				posted.putAll(jsonData);
+			}
+		}
+	}
+
+	public Map<String, Serializable> loadSession() {
+		SessionManager sessionManager = U.notNull(custom().sessionManager(), "session manager");
+
+		try {
+			return sessionManager.loadSession(this, sessionId());
+		} catch (Exception e) {
+			throw U.rte("Error occured while loading the session!", e);
+		}
+	}
+
+	public void saveSession(Map<String, Serializable> session) {
+		SessionManager sessionManager = U.notNull(custom().sessionManager(), "session manager");
+
+		try {
+			sessionManager.saveSession(this, sessionId(), session);
+		} catch (Exception e) {
+			throw U.rte("Error occured while saving the session!", e);
+		}
+	}
+
+	@Override
+	public OutputStream out() {
+		if (response != null) {
+			return response.out(); // performs extra checks
+		} else {
+			startRendering(200, true);
+			return channel().output().asOutputStream();
+		}
+	}
+
+	@Override
+	public MediaType contentType() {
+		MediaType contentType = response != null ? response.contentType() : null;
+		return U.or(contentType, defaultContentType);
 	}
 
 }

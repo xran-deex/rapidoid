@@ -1,6 +1,5 @@
 package org.rapidoid.buffer;
 
-import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.bytes.Bytes;
@@ -8,6 +7,7 @@ import org.rapidoid.data.BufRange;
 import org.rapidoid.data.BufRanges;
 import org.rapidoid.wrap.IntWrap;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -36,7 +36,7 @@ import java.nio.channels.WritableByteChannel;
 
 @Authors("Nikolche Mihajlovski")
 @Since("4.1.0")
-public class SynchronizedBuf extends RapidoidThing implements Buf {
+public class SynchronizedBuf extends OutputStream implements Buf {
 
 	private final Buf buf;
 
@@ -265,11 +265,6 @@ public class SynchronizedBuf extends RapidoidThing implements Buf {
 	}
 
 	@Override
-	public synchronized OutputStream asOutputStream() {
-		return buf.asOutputStream();
-	}
-
-	@Override
 	public synchronized String asText() {
 		return buf.asText();
 	}
@@ -339,4 +334,28 @@ public class SynchronizedBuf extends RapidoidThing implements Buf {
 		buf.checkpoint(checkpoint);
 	}
 
+	@Override
+	public synchronized void write(int byteValue) throws IOException {
+		buf.write(byteValue);
+	}
+
+	@Override
+	public synchronized void write(byte[] src, int off, int len) throws IOException {
+		buf.write(src, off, len);
+	}
+
+	@Override
+	public OutputStream asOutputStream() {
+		return this;
+	}
+
+	@Override
+	public Buf unwrap() {
+		return buf;
+	}
+
+	@Override
+	public synchronized void append(ByteArrayOutputStream src) {
+		buf.append(src);
+	}
 }

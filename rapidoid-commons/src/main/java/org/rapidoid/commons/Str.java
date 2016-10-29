@@ -42,32 +42,24 @@ public class Str extends RapidoidThing {
 	private static final Pattern CAMEL_SPLITTER_PATTERN = Pattern.compile(CAMEL_REGEX);
 
 	private static final String[][] XML_ESCAPE = {
-			{"&", "&amp;"},
-			{"\"", "&quot;"},
-			{"<", "&lt;"},
-			{">", "&gt;"},
-	};
-
-	private static final String[][] HTML_ESCAPE = {
-			{"&", "&amp;"},
-			{"\"", "&quot;"},
-			{"'", "&#39;"},
-			{"<", "&lt;"},
-			{">", "&gt;"},
+		{"&", "&amp;"},
+		{"\"", "&quot;"},
+		{"<", "&lt;"},
+		{">", "&gt;"},
 	};
 
 	private static final String[][] JAVA_ESCAPE = {
-			{"\n", "\\\\n"},
-			{"\r", "\\\\r"},
-			{"\t", "\\\\t"},
-			{"\"", "\\\\\""},
+		{"\n", "\\\\n"},
+		{"\r", "\\\\r"},
+		{"\t", "\\\\t"},
+		{"\"", "\\\\\""},
 	};
 
 	private Str() {
 	}
 
 	public static String[] camelSplit(String s) {
-		return s.split(CAMEL_REGEX);
+		return CAMEL_SPLITTER_PATTERN.split(s);
 	}
 
 	public static String camelPhrase(String s) {
@@ -213,10 +205,6 @@ public class Str extends RapidoidThing {
 		return Str.replace(s, XML_ESCAPE);
 	}
 
-	public static String htmlEscape(String s) {
-		return Str.replace(s, HTML_ESCAPE);
-	}
-
 	public static String javaEscape(String s) {
 		return Str.replace(s, JAVA_ESCAPE);
 	}
@@ -239,6 +227,39 @@ public class Str extends RapidoidThing {
 
 	public static byte[] fromBase64(String base64) {
 		return DatatypeConverter.parseBase64Binary(base64);
+	}
+
+	public static String wildcardToRegex(String pattern) {
+
+		if (pattern.isEmpty()) return "";
+		if (pattern.equals("*")) return "(.*)";
+
+		String[] nameParts = pattern.split("\\*", Integer.MAX_VALUE);
+		StringBuilder sb = new StringBuilder();
+
+		for (String part : nameParts) {
+			String s = part.isEmpty() ? "(.*)" : Pattern.quote(part);
+			sb.append(s);
+		}
+
+		return sb.toString();
+	}
+
+	public static String wildcardsToRegex(String... patterns) {
+
+		if (U.isEmpty(patterns)) return "";
+		if (patterns.length == 1) return wildcardToRegex(patterns[0]);
+
+		StringBuilder sb = new StringBuilder();
+
+		for (Iterator<String> it = U.iterator(patterns); it.hasNext(); ) {
+			String pattern = it.next();
+			sb.append(wildcardToRegex(pattern));
+
+			if (it.hasNext()) sb.append("|");
+		}
+
+		return "(?:" + sb + ")";
 	}
 
 }

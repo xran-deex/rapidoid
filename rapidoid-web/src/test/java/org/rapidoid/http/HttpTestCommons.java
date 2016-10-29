@@ -59,26 +59,18 @@ public abstract class HttpTestCommons extends TestCommons {
 		System.out.println("--- STARTING SERVER ---");
 
 		JPAUtil.reset();
-		Conf.setPath(getTestName());
-		IoC.defaultContext().reset();
+		Conf.ROOT.setPath(getTestName());
+		IoC.reset();
 
 		App.resetGlobalState();
 		OnChanges.ignore();
 
-		On.setup().listen();
+		On.setup().activate();
 		On.setup().reload();
 
 		System.out.println("--- SERVER STARTED ---");
 
 		verifyNoRoutes();
-
-		notFound("/");
-		notFound("/a");
-		notFound("/b?dgfg");
-		notFound("/c?x=123");
-		notFound("/else");
-		notFound("/echo");
-		notFound("/upload");
 	}
 
 	@After

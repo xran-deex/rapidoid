@@ -23,7 +23,6 @@ package org.rapidoid.http;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.io.Res;
 import org.rapidoid.job.Jobs;
 import org.rapidoid.setup.On;
@@ -38,7 +37,7 @@ import java.util.concurrent.TimeUnit;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.0.11")
-public class HttpHtmlApiTest extends IntegrationTestCommons {
+public class HttpHtmlApiTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void test01() {

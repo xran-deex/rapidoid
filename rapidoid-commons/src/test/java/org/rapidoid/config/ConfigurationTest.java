@@ -20,10 +20,12 @@ package org.rapidoid.config;
  * #L%
  */
 
+import org.junit.Before;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.commons.Env;
+import org.rapidoid.commons.EnvMode;
 import org.rapidoid.test.AbstractCommonsTest;
 import org.rapidoid.u.U;
 
@@ -31,17 +33,26 @@ import org.rapidoid.u.U;
 @Since("5.1.0")
 public class ConfigurationTest extends AbstractCommonsTest {
 
+	@Before
+	public void reset() {
+		Env.reset();
+		Conf.reset();
+		Conf.ROOT.setPath("some-non-existing");
+	}
+
 	@Test
 	public void testBasicConfig() {
 		isTrue(Env.test());
 
 		Conf.ROOT.set("abc", "123");
 		Conf.ROOT.set("cool", true);
-		Conf.ROOT.set("production", true);
 
 		eq(Conf.ROOT.entry("abc").or(0).longValue(), 123);
 		isTrue(Conf.ROOT.is("cool"));
-		isTrue(Env.production());
+
+		eq(Env.mode(), EnvMode.TEST);
+		isTrue(Env.test());
+		isFalse(Env.production());
 		isFalse(Env.dev());
 
 		checkDefaults();
@@ -61,7 +72,7 @@ public class ConfigurationTest extends AbstractCommonsTest {
 
 	@Test
 	public void testProfiles() {
-		Conf.args("port=12345", "profiles=mysql,p1,p2");
+		Env.setArgs("port=12345", "profiles=mysql,p1,p2");
 
 		eq(Env.profiles(), U.set("mysql", "p1", "p2", "test"));
 
@@ -74,7 +85,64 @@ public class ConfigurationTest extends AbstractCommonsTest {
 
 	@Test
 	public void testDefaultProfiles() {
-		eq(Env.profiles(), U.set("test", Env.PROFILE_DEFAULT));
+		eq(Env.profiles(), U.set("test", "default"));
+	}
+
+	@Test
+	public void testPathChange() {
+		Env.setArgs("config=myconfig");
+
+		checkDefaults();
+	}
+
+	@Test
+	public void testUsersConfigWithArgs() {
+		String pswd = "m-i_h?1f~@121";
+		Env.setArgs("users.admin.password=abc123", "users.nick.password=" + pswd, "users.nick.roles=moderator");
+
+		checkDefaults();
+
+		eq(Conf.USERS.toMap().keySet(), U.set("admin", "nick"));
+
+		eq(Conf.USERS.sub("admin").toMap(), U.map("roles", "administrator", "password", "abc123"));
+
+		eq(Conf.USERS.sub("nick").toMap(), U.map("roles", "moderator", "password", pswd));
+	}
+
+	@Test
+	public void testEnvironmentProperties() {
+		Env.setArgs("config=myconfig");
+
+		String osName = System.getProperty("os.name", "?");
+
+		Config os = Conf.section("os");
+
+		isFalse(os.isEmpty());
+
+		eq(os.get("name"), osName);
+		eq(os.entry("name").getOrNull(), osName);
+		eq(os.entry("name").or(""), osName);
+
+		isTrue(os.has("name"));
+		isFalse(os.is("name"));
+
+		checkDefaults();
+	}
+
+	@Test
+	public void testArgOverride() {
+		Env.setArgs("foo=bar123");
+
+		Conf.ROOT.set("foo", "b");
+		eq(Conf.ROOT.get("foo"), "bar123");
+	}
+
+	@Test
+	public void testNestedSet() {
+		Conf.ROOT.set("foo.bar", "b");
+		Conf.ROOT.set("foo.baz", "z");
+
+		eq(Conf.section("foo").toMap(), U.map("bar", "b", "baz", "z"));
 	}
 
 }

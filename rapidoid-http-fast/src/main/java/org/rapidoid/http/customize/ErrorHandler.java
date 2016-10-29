@@ -29,6 +29,6 @@ import org.rapidoid.http.Resp;
 @Since("5.0.11")
 public interface ErrorHandler {
 
-	Object handleError(Req req, Resp resp, Throwable error);
+	Object handleError(Req req, Resp resp, Throwable error) throws Exception;
 
 }

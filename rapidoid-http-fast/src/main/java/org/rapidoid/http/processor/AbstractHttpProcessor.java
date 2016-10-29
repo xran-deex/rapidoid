@@ -36,6 +36,8 @@ public abstract class AbstractHttpProcessor extends RapidoidThing implements Htt
 	protected final HttpProcessor next;
 	protected final WebSocketProtocol proto;
 
+	protected volatile boolean syncBufs = true;
+
 	protected AbstractHttpProcessor(HttpProcessor next, WebSocketProtocol proto) {
 		this.next = next;
 		this.proto = proto;
@@ -44,7 +46,7 @@ public abstract class AbstractHttpProcessor extends RapidoidThing implements Htt
 	@Override
 	public Server listen(String address, int port) {
 		FastHttpProtocol protocol = new FastHttpProtocol(this, proto);
-		return TCP.server().protocol(protocol).address(address).port(port).build().start();
+		return TCP.server().protocol(protocol).address(address).port(port).syncBufs(syncBufs).build().start();
 	}
 
 	@Override
@@ -52,4 +54,11 @@ public abstract class AbstractHttpProcessor extends RapidoidThing implements Htt
 		return listen("0.0.0.0", port);
 	}
 
+	public boolean syncBufs() {
+		return syncBufs;
+	}
+
+	public void syncBufs(boolean syncBufs) {
+		this.syncBufs = syncBufs;
+	}
 }

@@ -4,6 +4,7 @@ import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.commons.Env;
 import org.rapidoid.commons.RapidoidInfo;
+import org.rapidoid.commons.Str;
 import org.rapidoid.config.Conf;
 import org.rapidoid.gui.menu.PageMenu;
 import org.rapidoid.gui.reqinfo.IReqInfo;
@@ -13,8 +14,11 @@ import org.rapidoid.http.HttpVerb;
 import org.rapidoid.render.Template;
 import org.rapidoid.render.Templates;
 import org.rapidoid.u.U;
+import org.rapidoid.util.StreamUtils;
 import org.rapidoid.web.ScreenBean;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,8 +50,8 @@ public class HtmlPage extends ScreenBean {
 	public static volatile String commonJs = "/application.js";
 	public static volatile String commonCss = "/application.css";
 
-	private static volatile Template PAGE_TEMPLATE = Templates.fromFile("page.html");
-	private static volatile Template PAGE_AJAX_TEMPLATE = Templates.fromFile("page-ajax.html");
+	private static volatile Template PAGE_TEMPLATE = Templates.load("page.html");
+	private static volatile Template PAGE_AJAX_TEMPLATE = Templates.load("page-ajax.html");
 
 	public HtmlPage(Object[] content) {
 		content(content);
@@ -71,23 +75,36 @@ public class HtmlPage extends ScreenBean {
 		return html;
 	}
 
+	@Override
+	public void render(OutputStream out) {
+		String html = render();
+
+		try {
+			StreamUtils.writeUTF8(out, html);
+		} catch (IOException e) {
+			throw U.rte(e);
+		}
+	}
+
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> pageModel() {
 		IReqInfo req = ReqInfo.get();
 
 		Map<String, Object> model = U.map(req.data());
 
+		model.put("req", req);
+
 		model.put("appUrl", ReqInfoUtils.appUrl());
 		model.put("adminUrl", ReqInfoUtils.adminUrl());
 
 		model.put("dev", Env.dev());
-		model.put("admin", "admin".equalsIgnoreCase(req.segment()));
+		model.put("admin", "admin".equalsIgnoreCase(req.zone()));
 
 		model.put("host", req.host());
 		model.put("verb", req.verb());
 		model.put("uri", req.uri());
 		model.put("path", req.path());
-		model.put("segment", req.segment());
+		model.put("zone", req.zone());
 
 		model.put("username", req.username());
 
@@ -97,7 +114,7 @@ public class HtmlPage extends ScreenBean {
 		model.put("has", has());
 
 		model.put("content", GUI.multi(content()));
-		model.put("home", home());
+		model.put("home", req.contextPath() + home());
 		model.put("brand", brand());
 		model.put("title", title());
 
@@ -157,8 +174,22 @@ public class HtmlPage extends ScreenBean {
 			}
 		}
 
-		model.put("js", js());
-		model.put("css", css());
+		model.put("js", withContextPath(js(), req.contextPath()));
+		model.put("css", withContextPath(css(), req.contextPath()));
+	}
+
+	private static Set<String> withContextPath(Set<String> assets, String contextPath) {
+		Set<String> withContextPath = U.set();
+
+		for (String asset : assets) {
+			if (!asset.startsWith("http://") && !asset.startsWith("https://") && !asset.startsWith("//")) {
+				asset = contextPath + "/" + Str.triml(asset, "/");
+			}
+
+			withContextPath.add(asset);
+		}
+
+		return withContextPath;
 	}
 
 	private Map<String, Object> has() {
@@ -166,7 +197,7 @@ public class HtmlPage extends ScreenBean {
 
 		has.put("role", HtmlPageUtils.HAS_ROLE);
 		has.put("path", HtmlPageUtils.HAS_PATH);
-		has.put("segment", HtmlPageUtils.HAS_SEGMENT);
+		has.put("zone", HtmlPageUtils.HAS_ZONE);
 		has.put("page", HtmlPageUtils.HAS_PAGE);
 
 		return has;

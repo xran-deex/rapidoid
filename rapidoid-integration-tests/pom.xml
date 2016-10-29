@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.rapidoid</groupId>
 		<artifactId>rapidoid</artifactId>
-		<version>5.1.10-SNAPSHOT</version>
+		<version>5.2.6-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>rapidoid-integration-tests</artifactId>
@@ -23,7 +23,7 @@
 		</dependency>
 		<dependency>
 			<groupId>org.rapidoid</groupId>
-			<artifactId>rapidoid-standalone</artifactId>
+			<artifactId>rapidoid-platform</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 
@@ -54,6 +54,12 @@
 			<groupId>com.github.spullara.mustache.java</groupId>
 			<artifactId>compiler</artifactId>
 			<version>${mustache.java.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.samskivert</groupId>
+			<artifactId>jmustache</artifactId>
+			<version>${jmustache.version}</version>
 			<scope>test</scope>
 		</dependency>
 

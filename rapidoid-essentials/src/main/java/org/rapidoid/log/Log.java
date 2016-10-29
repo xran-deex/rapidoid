@@ -20,6 +20,9 @@ package org.rapidoid.log;
  * #L%
  */
 
+import org.rapidoid.RapidoidThing;
+import org.rapidoid.event.Event;
+import org.rapidoid.event.Fire;
 import org.rapidoid.u.U;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +37,7 @@ import java.util.concurrent.Callable;
  * @author Nikolche Mihajlovski
  * @since 2.0.0
  */
-public class Log {
+public class Log extends RapidoidThing {
 
 	public static final LogLevel LEVEL_TRACE = LogLevel.TRACE;
 	public static final LogLevel LEVEL_DEBUG = LogLevel.DEBUG;
@@ -46,7 +49,7 @@ public class Log {
 
 	private static volatile Callable<Logger> loggerFactory;
 
-	private static volatile boolean styled = false;
+	private static volatile boolean styled = System.console() != null;
 
 	private Log() {
 	}
@@ -63,7 +66,7 @@ public class Log {
 
 	public static synchronized void setLogLevel(LogLevel logLevel) {
 		if (LOG_LEVEL != logLevel) {
-			info("Setting log level", "from", LOG_LEVEL, "to", logLevel);
+			info("Changing log level", "from", LOG_LEVEL, "to", logLevel);
 		}
 		LOG_LEVEL = logLevel;
 	}
@@ -214,14 +217,61 @@ public class Log {
 	}
 
 	private static String printable(Object value) {
-		return String.valueOf(value);
+		return U.str(value);
 	}
 
 	private static void log(LogLevel level, String msg, String key1, Object value1, String key2, Object value2,
 	                        String key3, Object value3, String key4, Object value4, String key5, Object value5,
 	                        String key6, Object value6, String key7, Object value7, int paramsN) {
 
-		if (!isEnabled(level)) {
+		boolean visible = isEnabled(level);
+
+		// fire a log event
+
+		Event ev = level.event();
+
+		switch (paramsN) {
+			case 0:
+				Fire.event(ev, "_", msg, "_visible", visible);
+				break;
+
+			case 1:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1);
+				break;
+
+			case 2:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2);
+				break;
+
+			case 3:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2, key3, value3);
+				break;
+
+			case 4:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2, key3, value3, key4, value4);
+				break;
+
+			case 5:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2, key3, value3, key4, value4,
+					key5, value5);
+				break;
+
+			case 6:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2, key3, value3, key4, value4,
+					key5, value5, key6, value6);
+				break;
+
+			case 7:
+				Fire.event(ev, "_", msg, "_visible", visible, key1, value1, key2, value2, key3, value3, key4, value4,
+					key5, value5, key6, value6, key7, value7);
+				break;
+
+			default:
+				throw new IllegalStateException();
+		}
+
+		// process only the visible logs
+		if (!visible) {
 			return;
 		}
 
@@ -239,7 +289,7 @@ public class Log {
 			sb.append(" | ");
 
 			formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-					key5, value5, key6, value6, key7, value7, paramsN);
+				key5, value5, key6, value6, key7, value7, paramsN);
 
 			synchronized (System.out) {
 				System.out.println(sb.toString());
@@ -252,7 +302,7 @@ public class Log {
 				if (logger.isTraceEnabled()) {
 					StringBuilder sb = new StringBuilder();
 					formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-							key5, value5, key6, value6, key7, value7, paramsN);
+						key5, value5, key6, value6, key7, value7, paramsN);
 					logger.trace(sb.toString());
 				}
 				break;
@@ -261,7 +311,7 @@ public class Log {
 				if (logger.isDebugEnabled()) {
 					StringBuilder sb = new StringBuilder();
 					formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-							key5, value5, key6, value6, key7, value7, paramsN);
+						key5, value5, key6, value6, key7, value7, paramsN);
 					logger.debug(sb.toString());
 				}
 				break;
@@ -270,7 +320,7 @@ public class Log {
 				if (logger.isInfoEnabled()) {
 					StringBuilder sb = new StringBuilder();
 					formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-							key5, value5, key6, value6, key7, value7, paramsN);
+						key5, value5, key6, value6, key7, value7, paramsN);
 					logger.info(sb.toString());
 				}
 				break;
@@ -279,7 +329,7 @@ public class Log {
 				if (logger.isWarnEnabled()) {
 					StringBuilder sb = new StringBuilder();
 					formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-							key5, value5, key6, value6, key7, value7, paramsN);
+						key5, value5, key6, value6, key7, value7, paramsN);
 					logger.warn(sb.toString());
 				}
 				break;
@@ -288,7 +338,7 @@ public class Log {
 				if (logger.isErrorEnabled()) {
 					StringBuilder sb = new StringBuilder();
 					formatLogMsg(sb, msg, key1, value1, key2, value2, key3, value3, key4, value4,
-							key5, value5, key6, value6, key7, value7, paramsN);
+						key5, value5, key6, value6, key7, value7, paramsN);
 					logger.error(sb.toString());
 				}
 				break;
@@ -316,9 +366,14 @@ public class Log {
 
 	private static Callable<Logger> createLoggerFactory() {
 		try {
+
 			Class.forName("org.slf4j.LoggerFactory");
+			Class.forName("org.slf4j.impl.StaticLoggerBinder");
+
 			return createSlf4jLoggerFactory();
+
 		} catch (ClassNotFoundException e) {
+
 			return createNullLoggerFactory();
 		}
 	}

@@ -6,7 +6,7 @@ import org.rapidoid.annotation.Since;
 import org.rapidoid.annotation.ToString;
 import org.rapidoid.cls.Cls;
 import org.rapidoid.cls.TypeKind;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.commons.Dates;
 import org.rapidoid.lambda.Mapper;
 import org.rapidoid.log.Log;
@@ -50,21 +50,21 @@ public class Beany extends RapidoidThing {
 	private static final String SETTER = "^set[A-Z].*";
 
 	protected static final Map<Class<?>, BeanProperties> BEAN_PROPERTIES = Coll
-			.autoExpandingMap(new Mapper<Class<?>, BeanProperties>() {
+		.autoExpandingMap(new Mapper<Class<?>, BeanProperties>() {
 
-				@Override
-				public BeanProperties map(Class<?> clazz) throws Exception {
-					Map<String, BeanProp> properties = new LinkedHashMap<String, BeanProp>();
+			@Override
+			public BeanProperties map(Class<?> clazz) throws Exception {
+				Map<String, BeanProp> properties = new LinkedHashMap<String, BeanProp>();
 
-					getBeanProperties(clazz, properties);
+				getBeanProperties(clazz, properties);
 
-					for (Entry<String, BeanProp> e : properties.entrySet()) {
-						e.getValue().init();
-					}
-
-					return new BeanProperties(properties);
+				for (Entry<String, BeanProp> e : properties.entrySet()) {
+					e.getValue().init();
 				}
-			});
+
+				return new BeanProperties(properties);
+			}
+		});
 
 	private static void getBeanProperties(Class<?> clazz, Map<String, BeanProp> properties) {
 
@@ -91,7 +91,7 @@ public class Beany extends RapidoidThing {
 				String name = method.getName();
 
 				if (!name.startsWith("_") && !Modifier.isPrivate(modif) && !Modifier.isProtected(modif)
-						&& !Modifier.isStatic(modif)) {
+					&& !Modifier.isStatic(modif)) {
 
 					if ((name.matches(GETTER) && params.length == 0) || (name.matches(SETTER) && params.length == 1)) {
 
@@ -191,10 +191,13 @@ public class Beany extends RapidoidThing {
 	public static BeanProperties propertiesOf(Object obj) {
 		if (obj == null) {
 			return BeanProperties.NONE;
+
 		} else if (obj instanceof Map) {
 			return BeanProperties.from(((Map) obj));
+
 		} else if (obj instanceof Class) {
 			return propertiesOf((Class) obj);
+
 		} else {
 			return propertiesOf(obj.getClass());
 		}
@@ -542,9 +545,9 @@ public class Beany extends RapidoidThing {
 					E val2 = getPropValue(o2, order);
 
 					U.must(val1 == null || val1 instanceof Comparable, "The property '%s' (%s) is not comparable!",
-							order, Cls.of((val1)));
+						order, Cls.of((val1)));
 					U.must(val2 == null || val2 instanceof Comparable, "The property '%s' (%s) is not comparable!",
-							order, Cls.of((val2)));
+						order, Cls.of((val2)));
 
 					return sign * U.compare(val1, val2);
 				} catch (Exception e) {

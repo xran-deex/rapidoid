@@ -23,7 +23,7 @@ package org.rapidoid.expire;
 import org.rapidoid.activity.RapidoidThread;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.log.Log;
 import org.rapidoid.u.U;
 
@@ -42,6 +42,7 @@ public class ExpirationCrawlerThread extends RapidoidThread {
 		super(name);
 		this.resolution = resolution;
 		setPriority(Thread.MIN_PRIORITY);
+		setDaemon(true);
 	}
 
 	public void register(Iterable<? extends Expiring> collection) {

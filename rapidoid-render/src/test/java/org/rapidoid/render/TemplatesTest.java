@@ -23,6 +23,7 @@ package org.rapidoid.render;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.io.IO;
 import org.rapidoid.u.U;
 
 import java.util.List;
@@ -35,17 +36,33 @@ public class TemplatesTest extends AbstractRenderTest {
 
 	@Test
 	public void testPatterns() {
-		isTrue(Pattern.matches(TemplateParser.TAG, "<x-i-fd href=\"aa>dd\" b=\"dd\">"));
-		isTrue(Pattern.matches(TemplateParser.TAG, "<x-i-fd href=\"aa>dd\" \n  b=\"dd\">"));
-		isFalse(Pattern.matches(TemplateParser.TAG, "<x-i- href=\"aa>dd\" \n  b=\"dd\">"));
-		isFalse(Pattern.matches(TemplateParser.TAG, "<-ifd href=\"aa>dd\" \n  b=\"dd\">"));
+
+		List<String> valid = IO.loadLines("tags-valid.txt", true, "#");
+		List<String> invalid = IO.loadLines("tags-invalid.txt", true, "#");
+
+		notNull(valid);
+		notNull(invalid);
+
+		for (String tag : valid) {
+			tag = tag.replace("\\n", "\n").trim();
+			if (!Pattern.matches(TemplateParser.TAG, tag)) {
+				eq(tag, "EXPECTED TO BE VALID!");
+			}
+		}
+
+		for (String tag : invalid) {
+			tag = tag.replace("\\n", "\n").trim();
+			if (Pattern.compile(TemplateParser.TAG).matcher(tag).find()) {
+				eq(tag, "EXPECTED TO BE INVALID!");
+			}
+		}
 
 		eq(TemplateToCode.literal("a\"b"), "\"a\\\"b\"");
 	}
 
 	@Test
 	public void testFileTemplatesAPI() {
-		verify("tmpl", Templates.fromFile("tmpl.html").render(tmplModel()));
+		verify("tmpl", Templates.load("tmpl.html").render(tmplModel()));
 	}
 
 	private Map<String, List<String>> tmplModel() {
@@ -54,7 +71,7 @@ public class TemplatesTest extends AbstractRenderTest {
 
 	@Test
 	public void testStringTemplatesAPI() {
-		eq(Templates.fromString("${x}-${y}").render(U.map("x", 1), U.map("y", "2")), "1-2");
+		eq(Templates.compile("${x}-${y}").render(U.map("x", 1, "y", "2")), "1-2");
 	}
 
 	@Test

@@ -23,8 +23,8 @@ package org.rapidoid.crypto;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
+import org.rapidoid.commons.Env;
 import org.rapidoid.commons.Str;
-import org.rapidoid.config.Conf;
 import org.rapidoid.test.AbstractCommonsTest;
 
 @Authors("Nikolche Mihajlovski")
@@ -46,7 +46,7 @@ public class CryptoTest extends AbstractCommonsTest {
 
 	@Test
 	public void testSpecifiedSecret() {
-		Conf.args("secret=mysecret");
+		Env.setArgs("secret=mysecret");
 		String key = Str.toHex(Crypto.getSecretKey());
 		isTrue(key.equals("DCE88CB5E440BC26D371D64E55DBB67832BBB44C2887BEE9C1DF17F88BC1764B") || key.equals("3CDB902856D13CC88139DD290822DA99E85242F16E575E73ED7953208B88B045"));
 	}
@@ -70,13 +70,13 @@ public class CryptoTest extends AbstractCommonsTest {
 	@Test
 	public void testSHA512() {
 		eq(Crypto.sha512("abc"),
-				"ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
+			"ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f");
 		eq(Crypto.sha512("x"),
-				"a4abd4448c49562d828115d13a1fccea927f52b4d5459297f8b43e42da89238bc13626e43dcb38ddb082488927ec904fb42057443983e88585179d50551afe62");
+			"a4abd4448c49562d828115d13a1fccea927f52b4d5459297f8b43e42da89238bc13626e43dcb38ddb082488927ec904fb42057443983e88585179d50551afe62");
 		eq(Crypto.sha512(" "),
-				"f90ddd77e400dfe6a3fcf479b00b1ee29e7015c5bb8cd70f5f15b4886cc339275ff553fc8a053f8ddc7324f45168cffaf81f8c3ac93996f6536eef38e5e40768");
+			"f90ddd77e400dfe6a3fcf479b00b1ee29e7015c5bb8cd70f5f15b4886cc339275ff553fc8a053f8ddc7324f45168cffaf81f8c3ac93996f6536eef38e5e40768");
 		eq(Crypto.sha512(""),
-				"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
+			"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
 	}
 
 	@Test

@@ -4,18 +4,22 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.activity.AbstractLoopThread;
 import org.rapidoid.activity.RapidoidThread;
 import org.rapidoid.activity.RapidoidThreadFactory;
+import org.rapidoid.activity.RapidoidThreadLocals;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Profiles;
 import org.rapidoid.annotation.Run;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.cls.Cls;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
+import org.rapidoid.commons.Arr;
 import org.rapidoid.commons.Env;
 import org.rapidoid.commons.Str;
 import org.rapidoid.config.Conf;
+import org.rapidoid.config.ConfigOptions;
 import org.rapidoid.crypto.Crypto;
 import org.rapidoid.ctx.Ctx;
 import org.rapidoid.ctx.Ctxs;
+import org.rapidoid.event.Events;
 import org.rapidoid.insight.Insights;
 import org.rapidoid.io.IO;
 import org.rapidoid.io.Res;
@@ -27,8 +31,6 @@ import org.rapidoid.u.U;
 import org.rapidoid.validation.InvalidData;
 import org.rapidoid.wrap.BoolWrap;
 
-import javax.validation.ConstraintViolation;
-import javax.validation.ConstraintViolationException;
 import java.io.*;
 import java.lang.annotation.Annotation;
 import java.lang.management.ManagementFactory;
@@ -43,6 +45,8 @@ import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /*
  * #%L
@@ -68,12 +72,16 @@ import java.util.concurrent.*;
 @Since("2.0.0")
 public class Msc extends RapidoidThing implements Constants {
 
-	public static final Set<String> SPECIAL_ERRORS = Coll.synchronizedSet(
-			SecurityException.class.getName(),
-			InvalidData.class.getName(),
-			"javax.validation.ConstraintViolationException",
-			"javax.validation.ValidationException"
-	);
+	private static final String SPECIAL_ARG_REGEX = "\\s*(.*?)\\s*(->|<-|:=|<=|=>|==)\\s*(.*?)\\s*";
+
+	public static final String OS_NAME = System.getProperty("os.name");
+
+	private static volatile String uid;
+
+	private static volatile long measureStart;
+
+	public static final ScheduledThreadPoolExecutor EXECUTOR = new ScheduledThreadPoolExecutor(8,
+		new RapidoidThreadFactory("utils", true));
 
 	public static final Mapper<Object, Object> TRANSFORM_TO_STRING = new Mapper<Object, Object>() {
 		@Override
@@ -96,11 +104,6 @@ public class Msc extends RapidoidThing implements Constants {
 			}
 		}
 	};
-
-	private static long measureStart;
-
-	public static final ScheduledThreadPoolExecutor EXECUTOR = new ScheduledThreadPoolExecutor(8,
-			new RapidoidThreadFactory("utils"));
 
 	private Msc() {
 	}
@@ -231,13 +234,19 @@ public class Msc extends RapidoidThing implements Constants {
 	}
 
 	public static void benchmark(String name, int count, Runnable runnable) {
+		doBenchmark(name, count, runnable, false);
+	}
+
+	public static void doBenchmark(String name, int count, Runnable runnable, boolean silent) {
 		long start = U.time();
 
 		for (int i = 0; i < count; i++) {
 			runnable.run();
 		}
 
-		benchmarkComplete(name, count, start);
+		if (!silent) {
+			benchmarkComplete(name, count, start);
+		}
 	}
 
 	public static void benchmark(String name, int count, Operation<Integer> operation) {
@@ -280,12 +289,14 @@ public class Msc extends RapidoidThing implements Constants {
 		final Ctx ctx = Ctxs.get();
 
 		for (int i = 1; i <= threadsN; i++) {
-			new Thread() {
+			new RapidoidThread() {
+
+				@Override
 				public void run() {
 					Ctxs.attach(ctx != null ? ctx.span() : null);
 
 					try {
-						benchmark(name, countPerThread, runnable);
+						doBenchmark(name, countPerThread, runnable, true);
 						if (outsideLatch == null) {
 							latch.countDown();
 						}
@@ -297,7 +308,6 @@ public class Msc extends RapidoidThing implements Constants {
 					}
 				}
 
-				;
 			}.start();
 		}
 
@@ -360,9 +370,6 @@ public class Msc extends RapidoidThing implements Constants {
 
 	public static Throwable rootCause(Throwable e) {
 		while (e.getCause() != null) {
-			if (SPECIAL_ERRORS.contains(e.getClass().getName())) {
-				return e;
-			}
 			e = e.getCause();
 		}
 		return e;
@@ -407,6 +414,7 @@ public class Msc extends RapidoidThing implements Constants {
 		for (int i = 1; i <= threadsN; i++) {
 			final Integer n = i;
 			new Thread() {
+				@Override
 				public void run() {
 					Lmbd.eval(executable, n);
 					latch.countDown();
@@ -524,7 +532,7 @@ public class Msc extends RapidoidThing implements Constants {
 				if (clazz != null) {
 					Method main = Cls.findMethod(clazz, "main", String[].class);
 					if (main != null && main.getReturnType() == void.class
-							&& !main.isVarArgs() && main.getDeclaringClass().equals(clazz)) {
+						&& !main.isVarArgs() && main.getDeclaringClass().equals(clazz)) {
 						int modif = main.getModifiers();
 						if (Modifier.isStatic(modif) && Modifier.isPublic(modif)) {
 							return clazz;
@@ -782,6 +790,10 @@ public class Msc extends RapidoidThing implements Constants {
 		return Cls.exists("javax.persistence.Entity");
 	}
 
+	public static boolean hasHibernate() {
+		return Cls.exists("org.hibernate.cfg.Configuration");
+	}
+
 	public static boolean hasRapidoidJPA() {
 		return Cls.exists("org.rapidoid.jpa.JPA");
 	}
@@ -798,56 +810,12 @@ public class Msc extends RapidoidThing implements Constants {
 		return Cls.exists("ch.qos.logback.classic.Logger");
 	}
 
-	public static boolean isValidationError(Throwable error) {
-		return (error instanceof InvalidData) || error.getClass().getName().startsWith("javax.validation.");
+	public static boolean hasSlf4jImpl() {
+		return Cls.exists("org.slf4j.impl.StaticLoggerBinder");
 	}
 
-	public static ErrCodeAndMsg getErrorCodeAndMsg(Throwable err) {
-		Throwable cause = rootCause(err);
-
-		int code;
-		String defaultMsg;
-		String msg = cause.getMessage();
-
-		if (cause instanceof SecurityException) {
-			code = 403;
-			defaultMsg = "Access Denied!";
-
-		} else if (Msc.isValidationError(cause)) {
-			code = 422;
-			defaultMsg = "Validation Error!";
-
-			if (cause.getClass().getName().equals("javax.validation.ConstraintViolationException")) {
-				Set<ConstraintViolation<?>> violations = ((ConstraintViolationException) cause).getConstraintViolations();
-
-				StringBuilder sb = new StringBuilder();
-				sb.append("Validation failed: ");
-
-				for (Iterator<ConstraintViolation<?>> it = U.safe(violations).iterator(); it.hasNext(); ) {
-					ConstraintViolation<?> v = it.next();
-
-					sb.append(v.getRootBeanClass().getSimpleName());
-					sb.append(".");
-					sb.append(v.getPropertyPath());
-					sb.append(" (");
-					sb.append(v.getMessage());
-					sb.append(")");
-
-					if (it.hasNext()) {
-						sb.append(", ");
-					}
-				}
-
-				msg = sb.toString();
-			}
-
-		} else {
-			code = 500;
-			defaultMsg = "Internal Server Error!";
-		}
-
-		msg = U.or(msg, defaultMsg);
-		return new ErrCodeAndMsg(code, msg);
+	public static boolean isValidationError(Throwable error) {
+		return (error instanceof InvalidData) || error.getClass().getName().startsWith("javax.validation.");
 	}
 
 	public static <T> List<T> page(Iterable<T> items, int page, int pageSize) {
@@ -897,7 +865,8 @@ public class Msc extends RapidoidThing implements Constants {
 
 		for (Class<?> clazz : toInvoke) {
 			Msc.logSection("Invoking @Run component: " + clazz.getName());
-			Msc.invokeMain(clazz, Conf.getArgs());
+			String[] args = U.arrayOf(String.class, Env.args());
+			Msc.invokeMain(clazz, args);
 		}
 	}
 
@@ -980,11 +949,11 @@ public class Msc extends RapidoidThing implements Constants {
 
 			String key = e.getKey().toLowerCase();
 
-			if (key.contains("password") || key.contains("secret") || key.contains("token") || key.contains("private")) {
-				value = replacement;
-
-			} else if (value instanceof Map<?, ?>) {
+			if (value instanceof Map<?, ?>) {
 				value = (T) protectSensitiveInfo((Map<String, T>) value, replacement);
+
+			} else if (sensitiveKey(key)) {
+				value = replacement;
 			}
 
 			copy.put(e.getKey(), value);
@@ -993,8 +962,16 @@ public class Msc extends RapidoidThing implements Constants {
 		return copy;
 	}
 
+	public static boolean sensitiveKey(String key) {
+		return key.contains("password") || key.contains("secret") || key.contains("token") || key.contains("private");
+	}
+
 	public static int processId() {
-		return U.num(ManagementFactory.getRuntimeMXBean().getName().split("@")[0]);
+		return U.num(processName().split("@")[0]);
+	}
+
+	public static String processName() {
+		return ManagementFactory.getRuntimeMXBean().getName();
 	}
 
 	public static String javaVersion() {
@@ -1006,7 +983,7 @@ public class Msc extends RapidoidThing implements Constants {
 		return profiles == null || Env.hasAnyProfile(profiles.value());
 	}
 
-	public static boolean insideTest() {
+	public static boolean isInsideTest() {
 		StackTraceElement[] trace = Thread.currentThread().getStackTrace();
 
 		for (StackTraceElement traceElement : trace) {
@@ -1022,21 +999,135 @@ public class Msc extends RapidoidThing implements Constants {
 
 	public static Thread thread(Runnable runnable) {
 		Thread thread = new Thread(runnable);
+		thread.setName("Msc-thread-" + runnable.getClass());
 		thread.start();
 		return thread;
 	}
 
 	public static void reset() {
+		Env.reset();
+		Events.reset();
 		Log.setLogLevel(LogLevel.INFO);
-
-		Env.profiles().clear();
-		Env.profiles().add(Env.PROFILE_DEFAULT);
-
 		Crypto.reset();
 		Res.reset();
 		AppInfo.reset();
 		Conf.reset();
 		JDBC.reset();
+		Env.reset();
+
+		resetState();
+	}
+
+	private static void resetState() {
+		uid = null;
+		measureStart = 0;
+	}
+
+	public static boolean isAscii(String s) {
+		for (int i = 0; i < s.length(); i++) {
+			if (s.charAt(i) > 127) return false;
+		}
+		return true;
+	}
+
+	public static RapidoidThreadLocals locals() {
+		return RapidoidThreadLocals.get();
+	}
+
+	public static boolean bootService(String setup, String service) {
+		String prefix = setup + ".services=";
+
+		for (String arg : Env.args()) {
+			if (arg.startsWith(prefix)) {
+				String[] services = Str.triml(arg, prefix).split("\\,");
+
+				for (String srvc : services) {
+					U.must(ConfigOptions.SERVICE_NAMES.contains(srvc), "Unknown service: '%s'!", srvc);
+				}
+
+				return Arr.contains(services, service);
+			}
+		}
+
+		return false;
+	}
+
+	public static boolean dockerized() {
+		return U.eq(System.getenv("RAPIDOID_JAR"), "/opt/rapidoid.jar")
+			&& U.eq(System.getenv("RAPIDOID_TMP"), "/tmp/rapidoid")
+			&& U.notEmpty(System.getenv("RAPIDOID_VERSION"))
+			&& hasAppFolder();
+	}
+
+	private static boolean hasAppFolder() {
+		File app = new File("/app");
+		return app.exists() && app.isDirectory();
+	}
+
+	public static Object maybeMasked(Object value) {
+		return GlobalCfg.uniformOutput() ? "<?>" : value;
+	}
+
+	public static synchronized String id() {
+		if (uid == null) uid = Conf.ROOT.entry("id").or(processName());
+		return uid;
+	}
+
+	public static boolean hasConsole() {
+		return System.console() != null;
+	}
+
+	public static Map<String, Object> parseArgs(List<String> args) {
+		Map<String, Object> arguments = U.map();
+
+		for (String arg : U.safe(args)) {
+			if (!isSpecialArg(arg)) {
+
+				String[] parts = arg.split("=", 2);
+				String name = parts[0];
+
+				if (parts.length > 1) {
+					String value = parts[1];
+					arguments.put(name, value);
+				} else {
+					arguments.put(name, true);
+				}
+
+			} else {
+				processSpecialArg(arguments, arg);
+			}
+		}
+
+		return arguments;
+	}
+
+	public static boolean isSpecialArg(String arg) {
+		return arg.matches(SPECIAL_ARG_REGEX);
+	}
+
+	private static void processSpecialArg(Map<String, Object> arguments, String arg) {
+		Matcher m = Pattern.compile(SPECIAL_ARG_REGEX).matcher(arg);
+		U.must(m.matches(), "Invalid argument");
+
+		String left = m.group(1);
+		String sep = m.group(2);
+		String right = m.group(3);
+
+		switch (sep) {
+
+			case "->":
+				left = "proxy." + left;
+				break;
+
+			case "<=":
+				left = "sql." + left;
+				break;
+
+			default:
+				throw U.rte("Argument operator not supported: " + sep);
+		}
+
+		arguments.put(left, right);
 	}
 
 }

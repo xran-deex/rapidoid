@@ -27,6 +27,8 @@ import org.rapidoid.annotation.Since;
 @Since("4.1.0")
 public class RapidoidThread extends Thread {
 
+	private final RapidoidThreadLocals locals = new RapidoidThreadLocals();
+
 	public RapidoidThread() {
 	}
 
@@ -40,6 +42,10 @@ public class RapidoidThread extends Thread {
 
 	public <T> RapidoidThread(Runnable runnable, String name) {
 		super(runnable, name);
+	}
+
+	public RapidoidThreadLocals locals() {
+		return locals;
 	}
 
 }

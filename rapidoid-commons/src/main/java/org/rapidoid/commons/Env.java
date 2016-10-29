@@ -4,9 +4,13 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.config.Conf;
-import org.rapidoid.scan.ClasspathUtil;
+import org.rapidoid.log.Log;
+import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
 
+import java.io.File;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /*
@@ -33,47 +37,113 @@ import java.util.Set;
 @Since("5.1.0")
 public class Env extends RapidoidThing {
 
-	public static final String PROFILE_DEFAULT = "default";
+	private static final Environment env = new Environment();
 
-	private static final Set<String> PROFILES = Coll.synchronizedSet(PROFILE_DEFAULT);
+	private static volatile String root;
+
+	public static void reset() {
+		env.reset();
+		root = null;
+	}
 
 	public static boolean production() {
-		return Conf.ROOT.is("production") || Conf.ROOT.is("prod") || profile("production") || profile("prod");
+		return mode() == EnvMode.PRODUCTION;
 	}
 
 	public static boolean test() {
-		return Conf.ROOT.is("test") || profile("test") || Msc.insideTest();
+		return mode() == EnvMode.TEST;
 	}
 
 	public static boolean dev() {
-		return !production() && !test() && !ClasspathUtil.getClasspathFolders().isEmpty();
+		return mode() == EnvMode.DEV;
+	}
+
+	public static boolean isInitialized() {
+		return env.isInitialized();
+	}
+
+	public static EnvMode mode() {
+		return env.mode();
 	}
 
 	public static Set<String> profiles() {
-		if (dev()) {
-			PROFILES.add("dev");
-
-		} else if (test()) {
-			PROFILES.add("test");
-		}
-
-		return PROFILES;
+		return env.profiles();
 	}
 
-	public static boolean profile(String profileName) {
-		return PROFILES.contains(profileName);
+	public static void setProfiles(String... profiles) {
+		env.setProfiles(profiles);
+	}
+
+	public static void setArgs(String... args) {
+		env.setArgs(args);
+		processInitialConfig();
+	}
+
+	private static void processInitialConfig() {
+		String config = initial("config");
+		String root = initial("root");
+
+		if (Msc.dockerized()) {
+			if (U.isEmpty(root)) root = "/app";
+		}
+
+		if (root != null) {
+			setRoot(root);
+		}
+
+		if (config != null) {
+			Conf.setFilenameBase(config);
+		}
+	}
+
+	static String initial(String key) {
+		Map<String, Object> envAndArgs = Env.argsAsMap();
+		return (String) U.or(envAndArgs.get(key), Env.properties().get(key));
+	}
+
+	static boolean hasInitial(String key, Object value) {
+		return String.valueOf(initial(key)).equalsIgnoreCase(String.valueOf(value));
+	}
+
+	public static List<String> args() {
+		return env.args();
+	}
+
+	public static boolean hasProfile(String profileName) {
+		return env.hasProfile(profileName);
 	}
 
 	public static boolean hasAnyProfile(String... profileNames) {
-		for (String profileName : profileNames) {
-			if (profile(profileName)) {
-				return true;
-			}
-		}
-		return false;
+		return env.hasAnyProfile(profileNames);
 	}
 
-	public static String mode() {
-		return dev() ? "dev" : test() ? "test" : "production";
+	public static EnvProperties properties() {
+		return env.properties();
+	}
+
+	public static Map<String, Object> argsAsMap() {
+		return env.argsAsMap();
+	}
+
+	public static void setRoot(String root) {
+		if (U.neq(Env.root, root)) {
+			File dir = new File(root);
+
+			if (dir.exists()) {
+				if (dir.isDirectory()) {
+					Log.info("Setting application root", "!root", root, "!content", U.list(dir.listFiles()));
+				} else {
+					Log.error("The configured application root must be a folder!", "!root", root);
+				}
+			} else {
+				Log.error("The configured application root folder doesn't exist!", "!root", root);
+			}
+
+			Env.root = root;
+		}
+	}
+
+	public static String root() {
+		return root;
 	}
 }

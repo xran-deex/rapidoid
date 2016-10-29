@@ -1,0 +1,115 @@
+on:
+  port: 8888
+  address: 0.0.0.0
+
+admin:
+  port: same
+  address: 0.0.0.0
+
+app:
+  search: false
+  navbar: true
+  fluid: false
+  cdn: auto
+  contextPath: ''
+  home: /
+  menu: {}
+
+main-zone: {}
+
+admin-zone:
+  home: /_
+  brand: '<i class="fa fa-dashboard"></i> Admin'
+  search: false
+  fluid: false
+  menu:
+    Overview: /_
+    Application:
+      Routes: /_/routes
+      Beans: /_/beans
+      Configuration: /_/config
+      Deploy: /_/deploy
+      Terminate / Restart: /_/terminate
+    Data:
+      Entities: /_/entities
+    Details:
+      Metrics: /_/metrics
+      Classpath: /_/classpath
+    JMX:
+      Memory pool: /_/jmx/mempool
+      JVM Threads: /_/jmx/threads
+      Operating system: /_/jmx/os
+      Garbage collection: /_/jmx/gc
+      Memory: /_/jmx/memory
+      Runtime: /_/jmx/runtime
+      Classes: /_/jmx/classes
+      Compilation: /_/jmx/compilation
+
+users:
+  admin:
+    roles: administrator
+
+jobs:
+  executor:
+    threads: 256
+  scheduler:
+    threads: 64
+
+hibernate:
+  c3p0:
+    debug: false
+    initialPoolSize: 5
+    minPoolSize: 5
+    maxPoolSize: 100
+    acquireIncrement: 5
+    maxStatementsPerConnection: 10
+    idleConnectionTestPeriod: 300
+
+c3p0:
+  debug: false
+  initialPoolSize: 5
+  minPoolSize: 5
+  maxPoolSize: 100
+  acquireIncrement: 5
+  maxStatementsPerConnection: 10
+  idleConnectionTestPeriod: 300
+
+oauth:
+  google:
+    scope: profile,email
+    clientId: YOUR_GOOGLE_CLIENT_ID_HERE
+    clientSecret: YOUR_GOOGLE_CLIENT_SECRET_HERE
+
+  github:
+    scope: user:email
+    clientId: YOUR_GITHUB_CLIENT_ID_HERE
+    clientSecret: YOUR_GITHUB_CLIENT_SECRET_HERE
+
+  facebook:
+    scope: public_profile,email
+    clientId: YOUR_FACEBOOK_CLIENT_ID_HERE
+    clientSecret: YOUR_FACEBOOK_CLIENT_SECRET_HERE
+
+  linkedin:
+    scope: r_basicprofile,r_emailaddress
+    clientId: YOUR_LINKEDIN_CLIENT_ID_HERE
+    clientSecret: YOUR_LINKEDIN_CLIENT_SECRET_HERE
+
+http:
+  timeout: 30000
+  timeoutResolution: 5000
+  maxPipeline: 10
+  serverName: Rapidoid
+
+  mandatoryHeaders:
+    connection: true
+    date: true
+    server: true
+    contentType: true
+
+token:
+  ttl: 0 # unlimited
+
+log:
+  level: info
+  fancy: false # auto

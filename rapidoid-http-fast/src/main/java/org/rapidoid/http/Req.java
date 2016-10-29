@@ -5,6 +5,7 @@ import org.rapidoid.annotation.Since;
 import org.rapidoid.http.customize.Customization;
 import org.rapidoid.io.Upload;
 
+import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -69,13 +70,13 @@ public interface Req {
 	String host();
 
 	/**
-	 * Gets the name of the <b>application segment</b> handling the request. <br>
-	 * The default segment name is <code>main</code> for the <code>On</code> API, and <code>admin</code> for the <code>Admin</code> API.
+	 * Gets the name of the <b>application zone</b> handling the request. <br>
+	 * The default zone name is <code>main</code> for the <code>On</code> API, and <code>admin</code> for the <code>Admin</code> API.
 	 */
-	String segment();
+	String zone();
 
 	/**
-	 * Gets the <b>context path</b> of the application segment handling the request. <br>
+	 * Gets the <b>context path</b> of the application zone handling the request. <br>
 	 * The default context path is <code>/</code> for the <code>On</code> API, and <code>/_</code> for the <code>Admin</code> API.
 	 */
 	String contextPath();
@@ -219,45 +220,45 @@ public interface Req {
 	boolean hasSession();
 
 	/**
-	 * Provides <b>read/write access</b> to the <b>server-side session attributes</b> of the HTTP request.
+	 * Provides <b>read/write access</b> to the <b>server-side session attributes</b> of the HTTP request/response.
 	 */
 	Map<String, Serializable> session();
 
 	/**
-	 * Returns the value of the specified <b>server-side session attribute</b> from the HTTP request, or throws a
+	 * Returns the value of the specified <b>server-side session attribute</b> from the HTTP request/response, or throws a
 	 * runtime exception if it is not found.
 	 */
 	<T extends Serializable> T session(String name);
 
 	/**
-	 * Returns the value of the specified <b>server-side session attribute</b> from the HTTP request, or the specified
+	 * Returns the value of the specified <b>server-side session attribute</b> from the HTTP request/response, or the specified
 	 * default value, if it is not found.
 	 */
 	<T extends Serializable> T session(String name, T defaultValue);
 
-	/* COOKIE-PERSISTED SESSION: */
+	/* TOKEN DATA: */
 
 	/**
-	 * Does the HTTP request have a cookie-persisted session attached?
+	 * Does the HTTP request have a token attached?
 	 */
-	boolean hasCookiepack();
+	boolean hasToken();
 
 	/**
-	 * Provides <b>read/write access</b> to the <b>cookie-persisted session attributes</b> of the HTTP request.
+	 * Provides <b>read/write access</b> to the <b>token attributes</b> of the HTTP request/response.
 	 */
-	Map<String, Serializable> cookiepack();
+	Map<String, Serializable> token();
 
 	/**
-	 * Returns the value of the specified <b>cookie-persisted session attribute</b> from the HTTP request, or throws a
+	 * Returns the value of the specified <b>token attribute</b> from the HTTP request/response, or throws a
 	 * runtime exception if it is not found.
 	 */
-	<T extends Serializable> T cookiepack(String name);
+	<T extends Serializable> T token(String name);
 
 	/**
-	 * Returns the value of the specified <b>cookie-persisted session attribute</b> from the HTTP request, or the
+	 * Returns the value of the specified <b>token attribute</b> from the HTTP request/response, or the
 	 * specified default value, if it is not found.
 	 */
-	<T extends Serializable> T cookiepack(String name, T defaultValue);
+	<T extends Serializable> T token(String name, T defaultValue);
 
 	/* REQUEST HEADERS: */
 
@@ -336,8 +337,31 @@ public interface Req {
 	HttpRoutes routes();
 
 	/**
+	 * Provides access to the <b>matching HTTP route (if any)</b> of the web application setup.<br>
+	 * In case a generic handler handles the request, or no matching route was found, <code>null</code> is returned.
+	 */
+	Route route();
+
+	/**
 	 * Provides access to the <b>customization</b> of the web application setup.
 	 */
 	Customization custom();
+
+	/**
+	 * Reverts the previous processing of the request, usually with intention to process the same request again.
+	 */
+	void revert();
+
+	/**
+	 * First renders the response headers, then returns an <i>OutputStream</i> representing
+	 * the <b>response body</b>. The response body will be constructed by writing to the <i>OutputStream</i>.
+	 */
+	OutputStream out();
+
+	/**
+	 * Gets the <b><code>Content-Type</code> header</b> of the HTTP response if it has been assigned,
+	 * or the default value as configured in the HTTP route.
+	 */
+	MediaType contentType();
 
 }

@@ -24,7 +24,7 @@ import org.junit.Test;
 import org.rapidoid.NetTestCommons;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.http.MediaType;
 
 @Authors("Nikolche Mihajlovski")
 @Since("2.0.0")
@@ -44,8 +44,8 @@ public class MediaTypeTest extends NetTestCommons {
 		eq(new String(MediaType.CSS_UTF_8.getBytes()), "text/css; charset=utf-8");
 		eq(MediaType.getByFileExtension("css"), MediaType.CSS_UTF_8);
 
-		eq(new String(MediaType.JSON_UTF_8.getBytes()), "application/json; charset=utf-8");
-		eq(MediaType.getByFileExtension("json"), MediaType.JSON_UTF_8);
+		eq(new String(MediaType.JSON.getBytes()), "application/json");
+		eq(MediaType.getByFileExtension("json"), MediaType.JSON);
 
 		eq(new String(MediaType.JAVASCRIPT_UTF8.getBytes()), "application/javascript; charset=utf-8");
 		eq(MediaType.getByFileExtension("js"), MediaType.JAVASCRIPT_UTF8);

@@ -202,11 +202,24 @@ public class IO extends RapidoidThing {
 	}
 
 	public static void save(String filename, byte[] content) {
+		save(filename, content, 3);
+	}
+
+	public static void save(String filename, byte[] content, int retries) {
 		FileOutputStream out = null;
 		try {
 			out = new FileOutputStream(filename);
 			out.write(content);
 			close(out, false);
+		} catch (FileNotFoundException e) {
+			if (retries > 0) {
+				new File(filename).getParentFile().mkdirs();
+				U.sleep(200);
+				save(filename, content, retries - 1);
+			} else {
+				close(out, true);
+				throw U.rte(e);
+			}
 		} catch (Exception e) {
 			close(out, true);
 			throw U.rte(e);
@@ -277,22 +290,6 @@ public class IO extends RapidoidThing {
 		}
 	}
 
-	public static void findAll(File dir, List<String> found, boolean includeFiles, boolean includeDirectories) {
-		File[] files = dir.listFiles();
-
-		if (files != null) {
-			for (File f : files) {
-				if ((includeFiles && f.isFile()) || (includeDirectories && f.isDirectory())) {
-					found.add(f.getAbsolutePath());
-				}
-
-				if (f.isDirectory()) {
-					findAll(f, found, includeFiles, includeDirectories);
-				}
-			}
-		}
-	}
-
 	public static void write(OutputStream out, byte[] content) {
 		try {
 			out.write(content);
@@ -304,5 +301,14 @@ public class IO extends RapidoidThing {
 	public static void write(OutputStream out, String content) {
 		write(out, content.getBytes());
 	}
+
+	public static FileSearch find(String name) {
+		return find().name(name);
+	}
+
+	public static FileSearch find() {
+		return new FileSearch();
+	}
+
 
 }

@@ -28,12 +28,16 @@ import org.rapidoid.annotation.Since;
 @Since("5.1.0")
 public class Render extends RapidoidThing {
 
-	public static RenderDSL template(String templateSource) {
-		return new RenderDSL(Templates.fromString(templateSource));
+	public static RenderDSL template(String source) {
+		return new RenderDSL((RapidoidTemplate) Templates.DEFAULT_FACTORY.compile(source));
 	}
 
 	public static RenderDSL file(String filename) {
-		return new RenderDSL(Templates.fromFile(filename));
+		return file(filename, Templates.DEFAULT_FACTORY);
+	}
+
+	public static RenderDSL file(String filename, TemplateFactory factory) {
+		return new RenderDSL((RapidoidTemplate) factory.load(filename));
 	}
 
 }

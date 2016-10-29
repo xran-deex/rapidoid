@@ -4,7 +4,7 @@ import org.rapidoid.activity.RapidoidThread;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.commons.Rnd;
-import org.rapidoid.config.Conf;
+import org.rapidoid.config.ConfigUtil;
 import org.rapidoid.log.Log;
 import org.rapidoid.net.Protocol;
 import org.rapidoid.net.Server;
@@ -52,7 +52,7 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 
 	private final int port;
 
-	private int workers = Conf.cpus();
+	private int workers = ConfigUtil.cpus();
 
 	private boolean blockingAccept = false;
 
@@ -70,9 +70,11 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 
 	private final boolean noNelay;
 
+	private final boolean syncBufs;
+
 	public RapidoidServerLoop(Protocol protocol, Class<? extends DefaultExchange<?>> exchangeClass,
 	                          Class<? extends RapidoidHelper> helperClass, String address, int port,
-	                          int workers, int bufSizeKB, boolean noNelay) {
+	                          int workers, int bufSizeKB, boolean noNelay, boolean syncBufs) {
 		super("server");
 
 		this.protocol = protocol;
@@ -82,6 +84,7 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 		this.workers = workers;
 		this.bufSizeKB = bufSizeKB;
 		this.noNelay = noNelay;
+		this.syncBufs = syncBufs;
 		this.helperClass = U.or(helperClass, RapidoidHelper.class);
 
 		try {
@@ -105,7 +108,7 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 
 	private void validate() {
 		U.must(workers <= RapidoidWorker.MAX_IO_WORKERS, "Too many workers! Maximum = %s",
-				RapidoidWorker.MAX_IO_WORKERS);
+			RapidoidWorker.MAX_IO_WORKERS);
 	}
 
 	private void openSocket() throws IOException {
@@ -113,7 +116,7 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 		U.notNull(helperClass, "helperClass");
 
 		String blockingInfo = blockingAccept ? "blocking" : "non-blocking";
-		Log.debug("Initializing server", "address", address, "port", port, "accept", blockingInfo);
+		Log.debug("Initializing server", "address", address, "port", port, "sync", syncBufs, "accept", blockingInfo);
 
 		serverSocketChannel = ServerSocketChannel.open();
 
@@ -123,7 +126,7 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 
 			ServerSocket socket = serverSocketChannel.socket();
 
-			Log.debug("Opening port to listen", "port", port);
+			Log.info("!Starting server", "!address", address, "!port", port, "I/O workers", workers, "sync", syncBufs, "accept", blockingInfo);
 
 			InetSocketAddress addr = new InetSocketAddress(address, port);
 
@@ -138,8 +141,6 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 				serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 			}
 
-			Log.info("!Server started", "!address", address, "!port", port, "I/O workers", workers, "accept", blockingInfo);
-
 			initWorkers();
 
 		} else {
@@ -152,7 +153,8 @@ public class RapidoidServerLoop extends AbstractLoop<Server> implements Server, 
 
 		for (int i = 0; i < ioWorkers.length; i++) {
 
-			RapidoidWorkerThread workerThread = new RapidoidWorkerThread(i, protocol, exchangeClass, helperClass, bufSizeKB, noNelay);
+			RapidoidWorkerThread workerThread = new RapidoidWorkerThread(i, protocol, exchangeClass,
+				helperClass, bufSizeKB, noNelay, syncBufs);
 			workerThread.start();
 
 			ioWorkers[i] = workerThread.getWorker();

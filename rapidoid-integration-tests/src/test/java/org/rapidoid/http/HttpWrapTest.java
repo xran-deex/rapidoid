@@ -23,16 +23,15 @@ package org.rapidoid.http;
 import org.junit.Test;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.setup.On;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.1.0")
-public class HttpWrapTest extends IntegrationTestCommons {
+public class HttpWrapTest extends IsolatedIntegrationTest {
 
 	@Test
 	public void testWrap() {
-		On.defaults().wrap((req, invocation) -> invocation.invokeAndTransformResult(x -> x + "!"));
+		On.defaults().wrappers((req, invocation) -> invocation.invokeAndTransformResult(x -> x + "!"));
 		On.defaults().contentType(MediaType.BINARY);
 
 		On.get("/").html(() -> "a");

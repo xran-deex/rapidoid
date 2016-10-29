@@ -20,12 +20,24 @@ package org.rapidoid.log;
  * #L%
  */
 
+import org.rapidoid.event.Event;
+import org.rapidoid.event.Events;
+
 /**
  * @author Nikolche Mihajlovski
  * @since 2.0.0
  */
 public enum LogLevel {
 
-	TRACE, DEBUG, INFO, WARN, ERROR;
+	TRACE(Events.LOG_TRACE), DEBUG(Events.LOG_DEBUG), INFO(Events.LOG_INFO), WARN(Events.LOG_WARN), ERROR(Events.LOG_ERROR);
 
+	private final Event event;
+
+	LogLevel(Event event) {
+		this.event = event;
+	}
+
+	public Event event() {
+		return event;
+	}
 }

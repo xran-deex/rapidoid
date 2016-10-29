@@ -3,11 +3,8 @@ package org.rapidoid.render;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
-import org.rapidoid.io.Res;
-import org.rapidoid.lambda.Mapper;
-
-import java.util.Map;
+import org.rapidoid.commons.Arr;
+import org.rapidoid.u.U;
 
 /*
  * #%L
@@ -33,30 +30,43 @@ import java.util.Map;
 @Since("4.1.0")
 public class Templates extends RapidoidThing {
 
-	private static final Map<String, TemplateRenderer> TEMPLATES = Coll.autoExpandingMap(new Mapper<String, TemplateRenderer>() {
-		@Override
-		public TemplateRenderer map(String name) throws Exception {
-			return TemplateParser.parse(resource(name).mustExist().getContent()).compile();
-		}
-	});
+	private static final String DEFAULT_TEMPLATES = "default/templates";
 
-	public static Template fromFile(String filename) {
-		return new RapidoidTemplate(filename, TEMPLATES.get(filename));
+	public static final String[] DEFAULT_PATH = {"templates", "", DEFAULT_TEMPLATES};
+
+	public static final TemplateStore DEFAULT_STORE = new FileSystemTemplateStore(DEFAULT_PATH);
+
+	public static final RapidoidTemplateFactory DEFAULT_FACTORY = new RapidoidTemplateFactory(DEFAULT_STORE);
+
+	private static volatile String[] PATH = DEFAULT_PATH;
+
+	public static Template load(String filename) {
+		return DEFAULT_FACTORY.load(filename);
 	}
 
-	public static Template fromString(String source) {
-		return new RapidoidTemplate("", TemplateParser.parse(source).compile());
-	}
-
-	public static Res resource(String filename) {
-		return Res.from(filename, "templates", "default/templates", "");
-	}
-
-	public static Template fromRes(Res template) {
-		return fromFile(template.getName());
+	public static Template compile(String source) {
+		return DEFAULT_FACTORY.compile(source);
 	}
 
 	public static void reset() {
-		TEMPLATES.clear();
+		PATH = DEFAULT_PATH;
+		DEFAULT_FACTORY.reset();
 	}
+
+	public static void setPath(String... templatesPath) {
+		PATH = templatesPath;
+	}
+
+	public static String[] getPath() {
+		return PATH;
+	}
+
+	public static String[] withDefaultPath(String[] templatesPath) {
+		if (U.isEmpty(templatesPath) || U.neq(U.last(templatesPath), Templates.DEFAULT_TEMPLATES)) {
+			return Arr.concat(templatesPath, Templates.DEFAULT_TEMPLATES);
+		} else {
+			return templatesPath;
+		}
+	}
+
 }

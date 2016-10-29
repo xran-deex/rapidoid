@@ -42,9 +42,9 @@ import java.util.Set;
 public class PojoHandlersSetup extends RapidoidThing {
 
 	private static final Set<String> CONTROLLER_ANNOTATIONS = U.set(
-			Page.class.getName(), GET.class.getName(), POST.class.getName(),
-			PUT.class.getName(), DELETE.class.getName(), PATCH.class.getName(),
-			OPTIONS.class.getName(), HEAD.class.getName(), TRACE.class.getName()
+		Page.class.getName(), GET.class.getName(), POST.class.getName(),
+		PUT.class.getName(), DELETE.class.getName(), PATCH.class.getName(),
+		OPTIONS.class.getName(), HEAD.class.getName(), TRACE.class.getName()
 	);
 
 	private final Setup setup;
@@ -60,6 +60,7 @@ public class PojoHandlersSetup extends RapidoidThing {
 	}
 
 	public void register() {
+		App.managed(true);
 		process(true);
 	}
 
@@ -153,7 +154,7 @@ public class PojoHandlersSetup extends RapidoidThing {
 		TransactionMode tx = transaction != null ? transaction.value() : null;
 
 		Set<String> rolesAllowed = Secure.getRolesAllowed(method);
-		String[] roles = rolesAllowed.toArray(new String[rolesAllowed.size()]);
+		String[] roles = U.arrayOf(String.class, rolesAllowed);
 
 		for (Annotation ann : method.getAnnotations()) {
 			if (ann instanceof Page) {

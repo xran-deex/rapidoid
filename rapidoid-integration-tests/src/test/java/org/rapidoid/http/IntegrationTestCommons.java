@@ -25,9 +25,9 @@ import org.junit.Before;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.commons.Arr;
-import org.rapidoid.commons.MediaType;
 import org.rapidoid.config.Conf;
 import org.rapidoid.crypto.Crypto;
+import org.rapidoid.data.JSON;
 import org.rapidoid.fluent.Do;
 import org.rapidoid.io.IO;
 import org.rapidoid.ioc.IoC;
@@ -35,6 +35,8 @@ import org.rapidoid.jpa.JPA;
 import org.rapidoid.jpa.JPAUtil;
 import org.rapidoid.log.Log;
 import org.rapidoid.log.LogLevel;
+import org.rapidoid.reverseproxy.ProxyMapping;
+import org.rapidoid.reverseproxy.Reverse;
 import org.rapidoid.scan.ClasspathUtil;
 import org.rapidoid.setup.*;
 import org.rapidoid.sql.JDBC;
@@ -65,6 +67,8 @@ public abstract class IntegrationTestCommons extends TestCommons {
 	public void openContext() {
 		Msc.reset();
 
+		TimeZone.setDefault(TimeZone.getTimeZone("CET"));
+
 		ClasspathUtil.setRootPackage("some.nonexisting.app");
 
 		TimeZone.setDefault(TimeZone.getTimeZone("CET"));
@@ -73,14 +77,14 @@ public abstract class IntegrationTestCommons extends TestCommons {
 
 		My.reset();
 		JPAUtil.reset();
-		Conf.setPath(getTestName());
+		Conf.ROOT.setPath(getTestName());
 		Log.setLogLevel(LogLevel.INFO);
-		IoC.defaultContext().reset();
+		IoC.reset();
 
 		App.resetGlobalState();
 		OnChanges.ignore();
 
-		On.setup().listen();
+		On.setup().activate();
 		On.setup().reload();
 
 		JDBC.execute(RapidoidIntegrationTest.HSQL_TRUNCATE);
@@ -88,14 +92,6 @@ public abstract class IntegrationTestCommons extends TestCommons {
 		System.out.println("--- SERVER STARTED ---");
 
 		verifyNoRoutes();
-
-		notFound("/");
-		notFound("/a");
-		notFound("/b?dgfg");
-		notFound("/c?x=123");
-		notFound("/else");
-		notFound("/echo");
-		notFound("/upload");
 	}
 
 	@After
@@ -135,9 +131,9 @@ public abstract class IntegrationTestCommons extends TestCommons {
 			boolean hasF3 = x.files().containsKey("f3");
 
 			return U.join(":", x.cookies().get("foo"), x.cookies().get("COOKIE1"), x.posted().get("a"), x.files().size(),
-					Crypto.md5(x.file("f1").content()),
-					Crypto.md5(x.files().get("f2").get(0).content()),
-					Crypto.md5(hasF3 ? x.file("f3").content() : new byte[0]));
+				Crypto.md5(x.file("f1").content()),
+				Crypto.md5(x.files().get("f2").get(0).content()),
+				Crypto.md5(hasF3 ? x.file("f3").content() : new byte[0]));
 		});
 
 		On.req((Req x) -> x.response().html(U.join(":", x.verb(), x.path(), x.query())));
@@ -221,6 +217,10 @@ public abstract class IntegrationTestCommons extends TestCommons {
 		testReq(DEFAULT_PORT, "POST", uri, data, null);
 	}
 
+	protected void postJson(String uri, Map<String, ?> data) {
+		testReq(DEFAULT_PORT, "POST", uri, null, JSON.stringify(data));
+	}
+
 	protected void postData(int port, String uri, Map<String, ?> data) {
 		testReq(port, "POST", uri, data, null);
 	}
@@ -272,9 +272,13 @@ public abstract class IntegrationTestCommons extends TestCommons {
 
 	protected void notFound(int port, String verb, String uri) {
 		String resp = fetch(port, verb, uri, null, null);
-		String notFound = IO.load("404-not-found.txt");
-		U.notNull(notFound, "404-not-found");
-		check(verb + " " + uri, resp, notFound);
+
+		String notFound = U.notNull(IO.load("404-not-found.txt"), "404-not-found");
+		String notFound2 = U.notNull(IO.load("404-not-found-json.txt"), "404-not-found-json");
+
+		if (!httpResultsMatch(resp, notFound) && !httpResultsMatch(resp, notFound2)) {
+			eq(resp, "!!! Expected (404 Not Found) HTTP response as HTML or JSON !!!!");
+		}
 	}
 
 	private void testReq(int port, String verb, String uri, Map<String, ?> data, String json) {
@@ -352,6 +356,10 @@ public abstract class IntegrationTestCommons extends TestCommons {
 
 	protected void tx(Runnable action) {
 		JPA.transaction(action);
+	}
+
+	protected ProxyMapping proxy(String match, String upstreams) {
+		return Reverse.proxy().map(match).to(upstreams);
 	}
 
 }

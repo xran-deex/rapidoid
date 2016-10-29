@@ -62,7 +62,7 @@ public class UTest extends TestCommons {
 		eq(U.str(new short[]{-500, 0, 9}), "[-500, 0, 9]");
 		eq(U.str(new int[]{300000000, 70, 100}), "[300000000, 70, 100]");
 		eq(U.str(new long[]{3000000000000000000L, 1, -8900000000000000000L}),
-				"[3000000000000000000, 1, -8900000000000000000]");
+			"[3000000000000000000, 1, -8900000000000000000]");
 
 		eq(U.str(new float[]{-30.40000000f, -1.587f, 89.3f}), "[-30.4, -1.587, 89.3]");
 		eq(U.str(new double[]{-9987.1, -1.5, 8.3}), "[-9987.1, -1.5, 8.3]");
@@ -78,7 +78,7 @@ public class UTest extends TestCommons {
 		eq(U.str(new Object[]{}), "[]");
 		eq(U.str(new Object[]{1, new boolean[]{true, false}, 3}), "[1, [true, false], 3]");
 		eq(U.str(new Object[]{new double[]{-9987.1}, new char[]{'a', '.'}, new int[]{300, 70, 100}}),
-				"[[-9987.1], [a, .], [300, 70, 100]]");
+			"[[-9987.1], [a, .], [300, 70, 100]]");
 
 		eq(U.str(new int[][]{{1, 2}, {3, 4, 5}}), "[[1, 2], [3, 4, 5]]");
 
@@ -191,6 +191,30 @@ public class UTest extends TestCommons {
 		eq(U.safe(3), 3);
 
 		eq(U.safe((Long) null), 0L);
+	}
+
+	@Test
+	public void testArray() {
+		String[] arr = U.array("x", "y");
+		eq(arr.getClass(), String[].class);
+		eq(arr.length, 2);
+		eq(arr[0], "x");
+		eq(arr[1], "y");
+	}
+
+	@Test
+	public void testArrayOf() {
+		Number[] arr = U.arrayOf(Number.class, 123);
+		eq(arr.getClass(), Number[].class);
+		eq(arr.length, 1);
+		eq(arr[0].intValue(), 123);
+	}
+
+	@Test
+	public void testArrayOfType() {
+		Number[] arr = U.arrayOf(Number.class, U.list(1, 2, 3));
+		eq(arr.getClass(), Number[].class);
+		eq(arr, U.array(1, 2, 3));
 	}
 
 }

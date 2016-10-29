@@ -28,7 +28,7 @@ import org.rapidoid.util.Bufs;
 
 @Authors("Nikolche Mihajlovski")
 @Since("5.0.11")
-public class HttpFullRawResponseTest extends IntegrationTestCommons {
+public class HttpFullRawResponseTest extends IsolatedIntegrationTest {
 
 	public static final String BYTES_RESPONSE = "HTTP/1.1 200 OK\nContent-Length: 5\n\nbytes";
 
@@ -48,7 +48,7 @@ public class HttpFullRawResponseTest extends IntegrationTestCommons {
 
 	@Test
 	public void testByteBufferRawResponse() {
-		On.get("/buf").html((Req req, Resp resp) ->  resp.raw(Bufs.buf(BUF_RESPONSE)));
+		On.get("/buf").html((Req req, Resp resp) -> resp.raw(Bufs.buf(BUF_RESPONSE)));
 
 		onlyGet("/buf");
 	}

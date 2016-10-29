@@ -36,7 +36,7 @@ public class BytesUtil extends RapidoidThing implements Constants {
 
 	public static final byte[] CHARS_SWITCH_CASE = new byte[128];
 
-	private static final String URI_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._:/?#[]!$&()'+,;=%";
+	private static final String URI_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~:/?#[]@!$&()'*+,;=%";
 
 	private static final boolean[] URI_ALLOWED_CHARACTER = new boolean[128];
 
@@ -559,6 +559,8 @@ public class BytesUtil extends RapidoidThing implements Constants {
 			return false;
 		}
 
+		boolean inPath = true;
+
 		byte prev = '/';
 		for (int p = start + 1; p <= last; p++) {
 			byte b = bytes.get(p);
@@ -567,21 +569,18 @@ public class BytesUtil extends RapidoidThing implements Constants {
 				return false;
 			}
 
-			// disallow OR .. OR // OR ./ OR /.
-			if (b == '.' || b == '/') {
-				if (prev == '.' || prev == '/') {
-					return false;
+			// disallow '..' OR '//' in the URI's PATH (before the '?')
+			if (inPath) {
+				if (b == '.' || b == '/') {
+					if (prev == b) {
+						return false;
+					}
+				} else if (b == '?') {
+					inPath = false;
 				}
 			}
 
 			prev = b;
-		}
-
-		if (len > 1) {
-			byte b = bytes.get(last);
-			if (b == '.') {
-				return false;
-			}
 		}
 
 		return true;

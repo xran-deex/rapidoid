@@ -4,16 +4,16 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.cls.Cls;
-import org.rapidoid.commons.Coll;
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.collection.Coll;
+import org.rapidoid.config.BasicConfig;
 import org.rapidoid.config.Conf;
-import org.rapidoid.config.Config;
-import org.rapidoid.config.ConfigAlternatives;
 import org.rapidoid.ctx.Ctxs;
 import org.rapidoid.ctx.UserInfo;
 import org.rapidoid.http.HttpUtils;
+import org.rapidoid.http.MediaType;
 import org.rapidoid.http.Req;
 import org.rapidoid.http.Resp;
+import org.rapidoid.http.customize.Customization;
 import org.rapidoid.http.customize.LoginProvider;
 import org.rapidoid.http.customize.RolesProvider;
 import org.rapidoid.u.U;
@@ -167,12 +167,28 @@ public class RespImpl extends RapidoidThing implements Resp {
 
 	@Override
 	public Resp cookie(String name, String value, String... extras) {
+
 		if (U.notEmpty(extras)) {
 			value += "; " + U.join("; ", extras);
 		}
 
+		if (!cookieContainsPath(extras)) {
+			value += "; path=" + HttpUtils.cookiePath();
+		}
+
 		cookies().put(name, value);
+
 		return this;
+	}
+
+	private static boolean cookieContainsPath(String[] extras) {
+		for (String extra : extras) {
+			if (extra.toLowerCase().startsWith("path=")) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	@Override
@@ -187,13 +203,13 @@ public class RespImpl extends RapidoidThing implements Resp {
 	}
 
 	@Override
-	public Map<String, Serializable> cookiepack() {
-		return request().cookiepack();
+	public Map<String, Serializable> token() {
+		return request().token();
 	}
 
 	@Override
-	public Resp cookiepack(String name, Serializable value) {
-		cookiepack().put(name, value);
+	public Resp token(String name, Serializable value) {
+		token().put(name, value);
 		return this;
 	}
 
@@ -283,7 +299,7 @@ public class RespImpl extends RapidoidThing implements Resp {
 
 	@Override
 	public Resp json(Object content) {
-		return contentType(MediaType.JSON_UTF_8).result(content);
+		return contentType(MediaType.JSON).result(content);
 	}
 
 	@Override
@@ -293,7 +309,16 @@ public class RespImpl extends RapidoidThing implements Resp {
 
 	@Override
 	public synchronized String view() {
-		return view != null ? view : HttpUtils.defaultView(req.path());
+		return view != null ? view : HttpUtils.resName(req);
+	}
+
+	@Override
+	public Resp noView() {
+		return view("");
+	}
+
+	public boolean hasCustomView() {
+		return view != null;
 	}
 
 	@Override
@@ -321,27 +346,30 @@ public class RespImpl extends RapidoidThing implements Resp {
 
 	@Override
 	public boolean login(String username, String password) {
-		LoginProvider loginProvider = req.routes().custom().loginProvider();
+
+		LoginProvider loginProvider = Customization.of(req).loginProvider();
 		U.must(loginProvider != null, "A login provider wasn't set!");
 
-		RolesProvider rolesProvider = req.routes().custom().rolesProvider();
+		RolesProvider rolesProvider = Customization.of(req).rolesProvider();
 		U.must(rolesProvider != null, "A roles provider wasn't set!");
+
+		req.tokenChanged.set(true);
 
 		boolean success;
 
 		try {
-			success = loginProvider.login(username, password);
+			success = loginProvider.login(req, username, password);
 
 			if (success) {
-				Set<String> roles = rolesProvider.getRolesForUser(username);
+				Set<String> roles = rolesProvider.getRolesForUser(req, username);
 
 				long ttl = Conf.TOKEN.entry("ttl").or(0);
 				long expiresOn = ttl > 0 ? U.time() + ttl : Long.MAX_VALUE;
 
-				Ctxs.ctx().setUser(new UserInfo(username, roles));
+				Ctxs.required().setUser(new UserInfo(username, roles));
 
-				request().cookiepack().put(HttpUtils._USER, username);
-				request().cookiepack().put(HttpUtils._EXPIRES, expiresOn);
+				request().token().put(HttpUtils._USER, username);
+				request().token().put(HttpUtils._EXPIRES, expiresOn);
 			}
 
 		} catch (Throwable e) {
@@ -353,14 +381,9 @@ public class RespImpl extends RapidoidThing implements Resp {
 
 	@Override
 	public void logout() {
-		if (Ctxs.hasContext()) {
-			Ctxs.ctx().setUser(UserInfo.ANONYMOUS);
-		}
-
-		if (request().hasCookiepack()) {
-			request().cookiepack().remove(HttpUtils._USER);
-			request().cookiepack().remove(HttpUtils._EXPIRES);
-		}
+		HttpUtils.clearUserData(request());
+		HttpUtils.setResponseTokenCookie(this, "");
+		req.tokenChanged.set(true);
 	}
 
 	@Override
@@ -383,27 +406,34 @@ public class RespImpl extends RapidoidThing implements Resp {
 	}
 
 	private void initScreen(Screen screen) {
-		Config app = request().custom().appConfig();
-		Config segments = app.sub("segments");
-		Config segment = segments.sub(req.segment());
-		ConfigAlternatives cfg = segment.or(app);
+		BasicConfig zone = HttpUtils.zone(req);
 
-		Object brand = cfg.entry("brand").str().getOrNull();
-		screen.brand(U.or(brand, ""));
-		screen.title(cfg.entry("title").str().getOrNull());
-		screen.home(cfg.entry("home").str().or("/"));
+		String brand = zone.entry("brand").str().getOrNull();
+		String title = zone.entry("title").str().getOrNull();
 
-		screen.search(cfg.entry("search").bool().or(false));
-		screen.navbar(cfg.entry("navbar").bool().or(brand != null));
-		screen.fluid(cfg.entry("fluid").bool().or(false));
+		String siteName = req.host();
+		if (U.isEmpty(siteName)
+			|| siteName.equals("localhost") || siteName.startsWith("localhost:")
+			|| siteName.equals("127.0.0.1") || siteName.startsWith("127.0.0.1:")) {
+			siteName = "Rapidoid";
+		}
 
-		String cdn = cfg.entry("cdn").str().or("auto");
+		screen.brand(U.or(brand, siteName));
+		screen.title(U.or(title, siteName));
+
+		screen.home(zone.entry("home").str().or("/"));
+
+		screen.search(zone.entry("search").bool().or(false));
+		screen.navbar(zone.entry("navbar").bool().or(brand != null));
+		screen.fluid(zone.entry("fluid").bool().or(false));
+
+		String cdn = zone.entry("cdn").or("auto");
 		if (!"auto".equalsIgnoreCase(cdn)) {
 			screen.cdn(Cls.bool(cdn));
 		}
 
-		if (cfg.has("menu")) {
-			screen.menu(cfg.sub("menu").toMap());
+		if (zone.has("menu")) {
+			screen.menu(zone.sub("menu").toMap());
 		}
 	}
 
@@ -421,20 +451,20 @@ public class RespImpl extends RapidoidThing implements Resp {
 	@Override
 	public String toString() {
 		return "RespImpl{" +
-				(result != null ? "result=" + result : "") +
-				(body != null ? ", body=" + body : "") +
-				(raw != null ? ", raw=" + raw : "") +
-				", code=" + code +
-				(contentType != null ? ", contentType=" + contentType : "") +
-				", headers=" + headers +
-				", cookies=" + cookies +
-				", model=" + model +
-				(redirect != null ? ", redirect='" + redirect + '\'' : "") +
-				(filename != null ? ", filename='" + filename + '\'' : "") +
-				(file != null ? ", file=" + file : "") +
-				(view != null ? ", view='" + view + '\'' : "") +
-				", mvc=" + mvc +
-				'}';
+			(result != null ? "result=" + result : "") +
+			(body != null ? ", body=" + body : "") +
+			(raw != null ? ", raw=" + raw : "") +
+			", code=" + code +
+			(contentType != null ? ", contentType=" + contentType : "") +
+			", headers=" + headers +
+			", cookies=" + cookies +
+			", model=" + model +
+			(redirect != null ? ", redirect='" + redirect + '\'' : "") +
+			(filename != null ? ", filename='" + filename + '\'' : "") +
+			(file != null ? ", file=" + file : "") +
+			(view != null ? ", view='" + view + '\'' : "") +
+			", mvc=" + mvc +
+			'}';
 	}
 
 	public byte[] renderToBytes() {
@@ -453,7 +483,7 @@ public class RespImpl extends RapidoidThing implements Resp {
 	}
 
 	private byte[] serializeResponseContent() {
-		return HttpUtils.responseToBytes(result(), contentType(), req.routes().custom().jsonResponseRenderer());
+		return HttpUtils.responseToBytes(req, result(), contentType(), Customization.of(req).jsonResponseRenderer());
 	}
 
 }

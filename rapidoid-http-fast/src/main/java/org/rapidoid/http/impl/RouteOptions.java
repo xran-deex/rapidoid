@@ -4,13 +4,13 @@ import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.annotation.TransactionMode;
-import org.rapidoid.commons.Coll;
-import org.rapidoid.commons.MediaType;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.http.HttpWrapper;
+import org.rapidoid.http.MediaType;
 import org.rapidoid.http.RouteConfig;
 import org.rapidoid.u.U;
 
-import java.util.List;
+import java.util.Arrays;
 import java.util.Set;
 
 /*
@@ -43,24 +43,26 @@ public class RouteOptions extends RapidoidThing implements RouteConfig {
 
 	private volatile boolean mvc;
 
-	private volatile String segment;
+	private volatile String zone;
+
+	private volatile boolean managed = true;
 
 	private volatile TransactionMode transactionMode = TransactionMode.NONE;
 
 	private final Set<String> roles = Coll.synchronizedSet();
 
-	private final List<HttpWrapper> wrappers = Coll.synchronizedList();
+	private volatile HttpWrapper[] wrappers;
 
 	@Override
 	public String toString() {
 		String prefix = mvc ? "MVC" : "";
 		return prefix + "{" +
-				(contentType != null ? "contentType=" + contentType.info() : "") +
-				(view != null ? ", view='" + view + '\'' : "") +
-				(transactionMode != null ? ", transactionMode='" + transactionMode + '\'' : "") +
-				(U.notEmpty(roles) ? ", roles=" + roles : "") +
-				(U.notEmpty(wrappers) ? ", wrappers=" + wrappers : "") +
-				'}';
+			(contentType != null ? "contentType=" + contentType.info() : "") +
+			(view != null ? ", view='" + view + '\'' : "") +
+			(transactionMode != null ? ", transactionMode='" + transactionMode + '\'' : "") +
+			(U.notEmpty(roles) ? ", roles=" + roles : "") +
+			(U.notEmpty(wrappers) ? ", wrappers=" + wrappers : "") +
+			'}';
 	}
 
 	@Override
@@ -120,23 +122,34 @@ public class RouteOptions extends RapidoidThing implements RouteConfig {
 
 	@Override
 	public HttpWrapper[] wrappers() {
-		return wrappers.toArray(new HttpWrapper[wrappers.size()]);
+		return wrappers;
 	}
 
 	@Override
-	public RouteOptions wrap(HttpWrapper... wrappers) {
-		Coll.assign(this.wrappers, wrappers);
+	public RouteOptions wrappers(HttpWrapper... wrappers) {
+		this.wrappers = wrappers;
 		return this;
 	}
 
 	@Override
-	public String segment() {
-		return segment;
+	public String zone() {
+		return zone;
 	}
 
 	@Override
-	public RouteOptions segment(String segment) {
-		this.segment = segment;
+	public RouteOptions zone(String zone) {
+		this.zone = zone;
+		return this;
+	}
+
+	@Override
+	public boolean managed() {
+		return managed;
+	}
+
+	@Override
+	public RouteOptions managed(boolean managed) {
+		this.managed = managed;
 		return this;
 	}
 
@@ -147,9 +160,10 @@ public class RouteOptions extends RapidoidThing implements RouteConfig {
 		copy.view(view());
 		copy.mvc(mvc());
 		copy.transactionMode(transactionMode());
-		copy.roles(roles.toArray(new String[roles.size()]));
-		copy.wrap(wrappers());
-		copy.segment(segment());
+		copy.roles(U.arrayOf(String.class, roles));
+		copy.wrappers(wrappers());
+		copy.zone(zone());
+		copy.managed(managed());
 
 		return copy;
 	}
@@ -162,12 +176,14 @@ public class RouteOptions extends RapidoidThing implements RouteConfig {
 		RouteOptions that = (RouteOptions) o;
 
 		if (mvc != that.mvc) return false;
+		if (managed != that.managed) return false;
 		if (contentType != null ? !contentType.equals(that.contentType) : that.contentType != null) return false;
 		if (view != null ? !view.equals(that.view) : that.view != null) return false;
-		if (segment != null ? !segment.equals(that.segment) : that.segment != null) return false;
+		if (zone != null ? !zone.equals(that.zone) : that.zone != null) return false;
 		if (transactionMode != that.transactionMode) return false;
 		if (roles != null ? !roles.equals(that.roles) : that.roles != null) return false;
-		return wrappers != null ? wrappers.equals(that.wrappers) : that.wrappers == null;
+		return Arrays.equals(wrappers, that.wrappers);
+
 	}
 
 	@Override
@@ -175,10 +191,11 @@ public class RouteOptions extends RapidoidThing implements RouteConfig {
 		int result = contentType != null ? contentType.hashCode() : 0;
 		result = 31 * result + (view != null ? view.hashCode() : 0);
 		result = 31 * result + (mvc ? 1 : 0);
-		result = 31 * result + (segment != null ? segment.hashCode() : 0);
+		result = 31 * result + (zone != null ? zone.hashCode() : 0);
+		result = 31 * result + (managed ? 1 : 0);
 		result = 31 * result + (transactionMode != null ? transactionMode.hashCode() : 0);
 		result = 31 * result + (roles != null ? roles.hashCode() : 0);
-		result = 31 * result + (wrappers != null ? wrappers.hashCode() : 0);
+		result = 31 * result + Arrays.hashCode(wrappers);
 		return result;
 	}
 }

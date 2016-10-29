@@ -1,11 +1,18 @@
 package org.rapidoid.http.customize;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.config.Config;
+import org.rapidoid.ctx.Ctx;
+import org.rapidoid.ctx.Ctxs;
+import org.rapidoid.http.HttpWrapper;
+import org.rapidoid.http.Req;
+import org.rapidoid.http.customize.defaults.DefaultTemplateLoader;
 import org.rapidoid.setup.My;
 import org.rapidoid.u.U;
+import org.rapidoid.util.ByType;
 
 /*
  * #%L
@@ -32,20 +39,23 @@ import org.rapidoid.u.U;
 public class Customization extends RapidoidThing {
 
 	private final String name;
-
-	private final Config appConfig;
-
+	private final Customization defaults;
+	private final Config config;
 	private final Config serverConfig;
+
+	private final ByType<Throwable, ErrorHandler> errorHandlers = ByType.create();
 
 	private volatile String[] staticFilesPath;
 
 	private volatile ErrorHandler errorHandler;
 
-	private volatile ViewRenderer viewRenderer;
+	private volatile ViewResolver viewResolver;
 
-	private volatile PageRenderer pageRenderer;
+	private volatile PageDecorator pageDecorator;
 
 	private volatile JsonResponseRenderer jsonResponseRenderer;
+
+	private volatile JsonRequestBodyParser jsonRequestBodyParser;
 
 	private volatile BeanParameterFactory beanParameterFactory;
 
@@ -55,106 +65,272 @@ public class Customization extends RapidoidThing {
 
 	private volatile BeanValidator validator;
 
-	public Customization(String name, Config appConfig, Config serverConfig) {
+	private volatile ObjectMapper jackson;
+
+	private volatile EntityManagerProvider entityManagerProvider;
+
+	private volatile EntityManagerFactoryProvider entityManagerFactoryProvider;
+
+	private volatile SessionManager sessionManager;
+
+	private volatile StaticFilesSecurity staticFilesSecurity;
+
+	private volatile HttpWrapper[] wrappers;
+
+	private volatile ResourceLoader templateLoader;
+
+	public Customization(String name, Customization defaults, Config config, Config serverConfig) {
 		this.name = name;
-		this.appConfig = appConfig;
+		this.defaults = defaults;
+		this.config = config;
 		this.serverConfig = serverConfig;
+
 		reset();
 	}
 
-	public void reset() {
+	public synchronized void reset() {
 		staticFilesPath = null;
 		errorHandler = null;
-		viewRenderer = null;
-		pageRenderer = null;
+		viewResolver = null;
+		pageDecorator = null;
 		jsonResponseRenderer = null;
 		beanParameterFactory = null;
 		loginProvider = null;
 		rolesProvider = null;
 		validator = null;
+		jackson = null;
+		entityManagerProvider = null;
+		entityManagerFactoryProvider = null;
+		sessionManager = null;
+		errorHandlers.reset();
+		staticFilesSecurity = null;
+		wrappers = null;
+		templateLoader = null;
 	}
 
-	public void staticFilesPath(String... staticFilesPath) {
-		this.staticFilesPath = staticFilesPath;
+	public static Customization of(Req req) {
+		assert inValidContext(req);
+		return req != null ? req.custom() : My.custom();
 	}
 
-	public String[] staticFilesPath() {
-		return U.or(staticFilesPath, My.getStaticFilesPath());
+	private static boolean inValidContext(Req req) {
+		Ctx ctx = Ctxs.get();
+		Req ctxReq = ctx != null ? (Req) ctx.exchange() : null;
+		U.must(req == ctxReq, "The customization request (%s) doesn't match the context request (%s)!", req, ctxReq);
+		return true;
 	}
 
-	public ErrorHandler errorHandler() {
-		return U.or(errorHandler, My.getErrorHandler());
-	}
-
-	public void errorHandler(ErrorHandler errorHandler) {
-		this.errorHandler = errorHandler;
-	}
-
-	public ViewRenderer viewRenderer() {
-		return U.or(viewRenderer, My.getViewRenderer());
-	}
-
-	public void viewRenderer(ViewRenderer viewRenderer) {
-		this.viewRenderer = viewRenderer;
-	}
-
-	public JsonResponseRenderer jsonResponseRenderer() {
-		return U.or(jsonResponseRenderer, My.getJsonResponseRenderer());
-	}
-
-	public void jsonResponseRenderer(JsonResponseRenderer jsonResponseRenderer) {
-		this.jsonResponseRenderer = jsonResponseRenderer;
-	}
-
-	public BeanParameterFactory beanParameterFactory() {
-		return U.or(beanParameterFactory, My.getBeanParameterFactory());
-	}
-
-	public void beanParameterFactory(BeanParameterFactory beanParameterFactory) {
-		this.beanParameterFactory = beanParameterFactory;
-	}
-
-	public LoginProvider loginProvider() {
-		return U.or(loginProvider, My.getLoginProvider());
-	}
-
-	public void loginProvider(LoginProvider loginProvider) {
-		this.loginProvider = loginProvider;
-	}
-
-	public RolesProvider rolesProvider() {
-		return U.or(rolesProvider, My.getRolesProvider());
-	}
-
-	public void rolesProvider(RolesProvider rolesProvider) {
-		this.rolesProvider = rolesProvider;
-	}
-
-	public PageRenderer pageRenderer() {
-		return U.or(pageRenderer, My.getPageRenderer());
-	}
-
-	public void pageRenderer(PageRenderer pageRenderer) {
-		this.pageRenderer = pageRenderer;
-	}
-
-	public BeanValidator validator() {
-		return U.or(validator, My.getValidator());
-	}
-
-	public void validator(BeanValidator validator) {
-		this.validator = validator;
+	public static Customization current() {
+		Ctx ctx = Ctxs.get();
+		return of(ctx != null ? (Req) ctx.exchange() : null);
 	}
 
 	public String name() {
 		return name;
 	}
 
-	public Config appConfig() {
-		return appConfig;
+	public Customization defaults() {
+		return defaults;
+	}
+
+	public Config config() {
+		return config;
 	}
 
 	public Config serverConfig() {
 		return serverConfig;
+	}
+
+	public String[] staticFilesPath() {
+		return staticFilesPath != null || defaults == null ? staticFilesPath : defaults.staticFilesPath();
+	}
+
+	public Customization staticFilesPath(String... staticFilesPath) {
+		this.staticFilesPath = staticFilesPath;
+		return this;
+	}
+
+	public String[] templatesPath() {
+
+		if (templateLoader != null || defaults == null) {
+			U.must(templateLoader instanceof DefaultTemplateLoader, "A custom template loader was configured!");
+			return ((DefaultTemplateLoader) templateLoader).templatesPath();
+
+		} else {
+			return defaults.templatesPath();
+		}
+	}
+
+	public Customization templatesPath(String... templatesPath) {
+		this.templateLoader = new DefaultTemplateLoader(templatesPath);
+		return this;
+	}
+
+	public ErrorHandler errorHandler() {
+		return errorHandler != null || defaults == null ? errorHandler : defaults.errorHandler();
+	}
+
+	public Customization errorHandler(ErrorHandler errorHandler) {
+		this.errorHandler = errorHandler;
+		return this;
+	}
+
+	public ViewResolver viewResolver() {
+		return viewResolver != null || defaults == null ? viewResolver : defaults.viewResolver();
+	}
+
+	public Customization viewResolver(ViewResolver viewResolver) {
+		this.viewResolver = viewResolver;
+		return this;
+	}
+
+	public PageDecorator pageDecorator() {
+		return pageDecorator != null || defaults == null ? pageDecorator : defaults.pageDecorator();
+	}
+
+	public Customization pageDecorator(PageDecorator pageDecorator) {
+		this.pageDecorator = pageDecorator;
+		return this;
+	}
+
+	public JsonResponseRenderer jsonResponseRenderer() {
+		return jsonResponseRenderer != null || defaults == null ? jsonResponseRenderer : defaults.jsonResponseRenderer();
+	}
+
+	public Customization jsonResponseRenderer(JsonResponseRenderer jsonResponseRenderer) {
+		this.jsonResponseRenderer = jsonResponseRenderer;
+		return this;
+	}
+
+	public BeanParameterFactory beanParameterFactory() {
+		return beanParameterFactory != null || defaults == null ? beanParameterFactory : defaults.beanParameterFactory();
+	}
+
+	public Customization beanParameterFactory(BeanParameterFactory beanParameterFactory) {
+		this.beanParameterFactory = beanParameterFactory;
+		return this;
+	}
+
+	public LoginProvider loginProvider() {
+		return loginProvider != null || defaults == null ? loginProvider : defaults.loginProvider();
+	}
+
+	public Customization loginProvider(LoginProvider loginProvider) {
+		this.loginProvider = loginProvider;
+		return this;
+	}
+
+	public RolesProvider rolesProvider() {
+		return rolesProvider != null || defaults == null ? rolesProvider : defaults.rolesProvider();
+	}
+
+	public Customization rolesProvider(RolesProvider rolesProvider) {
+		this.rolesProvider = rolesProvider;
+		return this;
+	}
+
+	public BeanValidator validator() {
+		return validator != null || defaults == null ? validator : defaults.validator();
+	}
+
+	public Customization validator(BeanValidator validator) {
+		this.validator = validator;
+		return this;
+	}
+
+	public ObjectMapper jackson() {
+		return jackson != null || defaults == null ? jackson : defaults.jackson();
+	}
+
+	public Customization jackson(ObjectMapper jackson) {
+		this.jackson = jackson;
+		return this;
+	}
+
+	public EntityManagerProvider entityManagerProvider() {
+		return entityManagerProvider != null || defaults == null ? entityManagerProvider : defaults.entityManagerProvider();
+	}
+
+	public Customization entityManagerProvider(EntityManagerProvider entityManagerProvider) {
+		this.entityManagerProvider = entityManagerProvider;
+		return this;
+	}
+
+	public EntityManagerFactoryProvider entityManagerFactoryProvider() {
+		return entityManagerFactoryProvider != null || defaults == null ? entityManagerFactoryProvider : defaults.entityManagerFactoryProvider();
+	}
+
+	public Customization entityManagerFactoryProvider(EntityManagerFactoryProvider entityManagerFactoryProvider) {
+		this.entityManagerFactoryProvider = entityManagerFactoryProvider;
+		return this;
+	}
+
+	public JsonRequestBodyParser jsonRequestBodyParser() {
+		return jsonRequestBodyParser != null || defaults == null ? jsonRequestBodyParser : defaults.jsonRequestBodyParser();
+	}
+
+	public Customization jsonRequestBodyParser(JsonRequestBodyParser jsonRequestBodyParser) {
+		this.jsonRequestBodyParser = jsonRequestBodyParser;
+		return this;
+	}
+
+	public SessionManager sessionManager() {
+		return sessionManager != null || defaults == null ? sessionManager : defaults.sessionManager();
+	}
+
+	public Customization sessionManager(SessionManager sessionManager) {
+		this.sessionManager = sessionManager;
+		return this;
+	}
+
+	public ByType<Throwable, ErrorHandler> errorHandlers() {
+		return errorHandlers;
+	}
+
+	public ErrorHandler findErrorHandlerByType(Class<? extends Throwable> errorType) {
+		ErrorHandler handler;
+		Customization custom = this;
+
+		do {
+			handler = custom.errorHandlers().findByType(errorType);
+			custom = custom.defaults();
+		} while (handler == null && custom != null);
+
+		return handler;
+	}
+
+	public StaticFilesSecurity staticFilesSecurity() {
+		return staticFilesSecurity != null || defaults == null ? staticFilesSecurity : defaults.staticFilesSecurity();
+	}
+
+	public Customization staticFilesSecurity(StaticFilesSecurity staticFilesSecurity) {
+		this.staticFilesSecurity = staticFilesSecurity;
+		return this;
+	}
+
+	public HttpWrapper[] wrappers() {
+		return wrappers != null || defaults == null ? wrappers : defaults.wrappers();
+	}
+
+	public Customization wrappers(HttpWrapper... wrappers) {
+		this.wrappers = wrappers;
+		return this;
+	}
+
+	public ResourceLoader templateLoader() {
+		return templateLoader != null || defaults == null ? templateLoader : defaults.templateLoader();
+	}
+
+	public Customization templateLoader(ResourceLoader templateLoader) {
+		this.templateLoader = templateLoader;
+		return this;
+	}
+
+	@Override
+	public String toString() {
+		return "Customization{" +
+			"name='" + name + '\'' +
+			(defaults != null ? ", defaults=" + defaults : "") +
+			'}';
 	}
 }

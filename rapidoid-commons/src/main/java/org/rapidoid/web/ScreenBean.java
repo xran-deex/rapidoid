@@ -3,10 +3,11 @@ package org.rapidoid.web;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.commons.Env;
 import org.rapidoid.u.U;
 
+import java.io.OutputStream;
 import java.util.Map;
 import java.util.Set;
 
@@ -43,13 +44,18 @@ public class ScreenBean extends RapidoidThing implements Screen {
 	private volatile boolean search;
 	private volatile boolean navbar = true;
 	private volatile boolean fluid;
-	private volatile boolean cdn = !Env.dev();
+	private volatile boolean cdn = Env.production();
 
 	private final Set<String> js = Coll.synchronizedSet();
 	private final Set<String> css = Coll.synchronizedSet();
 
 	@Override
 	public String render() {
+		throw U.rte("The Screen cannot render itself!");
+	}
+
+	@Override
+	public void render(OutputStream out) {
 		throw U.rte("The Screen cannot render itself!");
 	}
 

@@ -4,8 +4,9 @@ import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
 import org.rapidoid.buffer.BufGroup;
 import org.rapidoid.buffer.IncompleteReadException;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.config.Conf;
+import org.rapidoid.config.ConfigUtil;
 import org.rapidoid.ctx.Ctxs;
 import org.rapidoid.expire.ExpirationCrawlerThread;
 import org.rapidoid.expire.Expire;
@@ -57,6 +58,8 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 
 	private static final ExpirationCrawlerThread idleConnectionsCrawler;
 
+	private static final int connTimeout;
+
 	private final Queue<SocketChannel> connected;
 
 	private final SimpleList<RapidoidConnection> done;
@@ -66,8 +69,6 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 	private final Set<RapidoidConnection> allConnections = Coll.concurrentSet();
 
 	private final int maxPipelineSize;
-
-	private final int connTimeout;
 
 	final Protocol serverProtocol;
 
@@ -84,23 +85,30 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 	RapidoidWorker next;
 
 	static {
-		idleConnectionsCrawler = Expire.crawler("idleConnections", Conf.HTTP.entry("timeoutResolution").or(5000));
+		int timeoutResolution = Conf.HTTP.entry("timeoutResolution").or(5000);
+		connTimeout = Conf.HTTP.entry("timeout").or(30000);
+
+		if (timeoutResolution > 0 && connTimeout > 0) {
+			idleConnectionsCrawler = Expire.crawler("idleConnections", timeoutResolution);
+		} else {
+			idleConnectionsCrawler = null;
+		}
 	}
 
 	public RapidoidWorker(String name, final Protocol protocol, final RapidoidHelper helper,
-	                      int bufSizeKB, boolean noNelay) {
+	                      int bufSizeKB, boolean noNelay, boolean syncBufs) {
 
 		super(name);
 
-		this.bufs = new BufGroup(14); // 2^14B (16 KB per buffer segment)
+		this.bufs = new BufGroup(14, syncBufs); // 2^14B (16 KB per buffer segment)
+
 		this.serverProtocol = protocol;
 		this.helper = helper;
 
 		this.maxPipelineSize = Conf.HTTP.entry("maxPipeline").or(10);
-		this.connTimeout = Conf.HTTP.entry("timeout").or(30000);
 
-		final int queueSize = Conf.micro() ? 1000 : 1000000;
-		final int growFactor = Conf.micro() ? 2 : 10;
+		final int queueSize = ConfigUtil.micro() ? 1000 : 1000000;
+		final int growFactor = ConfigUtil.micro() ? 2 : 10;
 
 		this.connected = new ArrayBlockingQueue<SocketChannel>(queueSize);
 		this.done = new SimpleList<RapidoidConnection>(queueSize / 10, growFactor);
@@ -115,7 +123,9 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 		this.bufSize = bufSizeKB * 1024;
 		this.noDelay = noNelay;
 
-		idleConnectionsCrawler.register(allConnections);
+		if (idleConnectionsCrawler != null) {
+			idleConnectionsCrawler.register(allConnections);
+		}
 	}
 
 	public void accept(SocketChannel socketChannel) {
@@ -434,9 +444,9 @@ public class RapidoidWorker extends AbstractEventLoop<RapidoidWorker> {
 		conn.key = key;
 		conn.setProtocol(protocol);
 
-		if (protocol instanceof CtxListener) {
-			conn.setListener((CtxListener) protocol);
-		}
+//		if (protocol instanceof CtxListener) {
+//			conn.setListener((CtxListener) protocol);
+//		}
 
 		key.attach(conn);
 

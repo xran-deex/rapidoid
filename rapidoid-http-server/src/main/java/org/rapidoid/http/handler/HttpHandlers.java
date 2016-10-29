@@ -42,6 +42,7 @@ import java.util.concurrent.Callable;
 public class HttpHandlers extends RapidoidThing {
 
 	public static HttpHandler from(FastHttp http, HttpRoutes routes, NParamLambda handler, RouteOptions options) {
+
 		if (handler instanceof ReqHandler) {
 			return new DelegatingParamsAwareReqHandler(http, routes, options, (ReqHandler) handler);
 
@@ -103,9 +104,8 @@ public class HttpHandlers extends RapidoidThing {
 		routes.on(verb, path, new PredefinedResponseHandler(http, routes, options, response));
 	}
 
-	@SuppressWarnings("unchecked")
 	public static void register(FastHttp http, HttpRoutes routes, String verb, String path, RouteOptions options, Callable<?> handler) {
-		routes.on(verb, path, new CallableHttpHandler(http, routes, options, (Callable<Object>) handler));
+		routes.on(verb, path, new CallableHttpHandler(http, routes, options, handler));
 	}
 
 	public static void register(FastHttp http, HttpRoutes routes, String verb, String path, HttpHandler handler) {

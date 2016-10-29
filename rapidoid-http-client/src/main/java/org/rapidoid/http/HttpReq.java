@@ -3,12 +3,13 @@ package org.rapidoid.http;
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.Authors;
 import org.rapidoid.annotation.Since;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
 import org.rapidoid.concurrent.Callback;
 import org.rapidoid.concurrent.Future;
 import org.rapidoid.data.JSON;
 import org.rapidoid.io.Upload;
 import org.rapidoid.u.U;
+import org.rapidoid.util.Expectation;
 
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,8 @@ public class HttpReq extends RapidoidThing {
 	private volatile byte[] body = null;
 
 	private final Map<String, String> headers = Coll.synchronizedMap();
+
+	private final Map<String, String> cookies = Coll.synchronizedMap();
 
 	private final Map<String, Object> data = Coll.synchronizedMap();
 
@@ -105,6 +108,15 @@ public class HttpReq extends RapidoidThing {
 		return this.headers;
 	}
 
+	public HttpReq cookies(Map<String, String> cookies) {
+		Coll.assign(this.cookies, cookies);
+		return this;
+	}
+
+	public Map<String, String> cookies() {
+		return this.cookies;
+	}
+
 	public HttpReq data(Map<String, ?> data) {
 		Coll.assign(this.data, data);
 		return this;
@@ -159,6 +171,11 @@ public class HttpReq extends RapidoidThing {
 		return this;
 	}
 
+	public HttpReq cookie(String name, String value) {
+		cookies().put(name, value);
+		return this;
+	}
+
 	public HttpReq data(String name, Object value) {
 		data().put(name, value);
 		return this;
@@ -206,6 +223,10 @@ public class HttpReq extends RapidoidThing {
 
 	public Map<String, Object> toMap() {
 		return parse();
+	}
+
+	public Expectation expect() {
+		return new Expectation(parse());
 	}
 
 	public <T> T toBean(Class<T> beanClass) {

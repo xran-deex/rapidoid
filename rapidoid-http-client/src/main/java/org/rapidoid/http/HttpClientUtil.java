@@ -32,6 +32,7 @@ import org.rapidoid.u.U;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
@@ -63,13 +64,13 @@ public class HttpClientUtil extends RapidoidThing {
 	private static final RedirectStrategy NO_REDIRECTS = new RedirectStrategy() {
 		@Override
 		public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context)
-				throws ProtocolException {
+			throws ProtocolException {
 			return false;
 		}
 
 		@Override
 		public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context)
-				throws ProtocolException {
+			throws ProtocolException {
 			return null;
 		}
 	};
@@ -79,13 +80,13 @@ public class HttpClientUtil extends RapidoidThing {
 		ConnectionReuseStrategy reuseStrategy = client.reuseConnections() ? new DefaultConnectionReuseStrategy() : new NoConnectionReuseStrategy();
 
 		HttpAsyncClientBuilder builder = HttpAsyncClients.custom()
-				.setThreadFactory(new RapidoidThreadFactory("http-client"))
-				.disableConnectionState()
-				.disableAuthCaching()
-				.setMaxConnPerRoute(client.maxConnPerRoute())
-				.setMaxConnTotal(client.maxConnTotal())
-				.setConnectionReuseStrategy(reuseStrategy)
-				.setRedirectStrategy(client.followRedirects() ? new DefaultRedirectStrategy() : NO_REDIRECTS);
+			.setThreadFactory(new RapidoidThreadFactory("http-client", true))
+			.disableConnectionState()
+			.disableAuthCaching()
+			.setMaxConnPerRoute(client.maxConnPerRoute())
+			.setMaxConnTotal(client.maxConnTotal())
+			.setConnectionReuseStrategy(reuseStrategy)
+			.setRedirectStrategy(client.followRedirects() ? new DefaultRedirectStrategy() : NO_REDIRECTS);
 
 		if (!U.isEmpty(client.cookies())) {
 			BasicCookieStore cookieStore = new BasicCookieStore();
@@ -127,6 +128,7 @@ public class HttpClientUtil extends RapidoidThing {
 	static HttpRequestBase createRequest(HttpReq config) {
 
 		Map<String, String> headers = U.safe(config.headers());
+		Map<String, String> cookies = U.safe(config.cookies());
 
 		String url = config.url();
 
@@ -134,6 +136,10 @@ public class HttpClientUtil extends RapidoidThing {
 
 		for (Map.Entry<String, String> e : headers.entrySet()) {
 			req.addHeader(e.getKey(), e.getValue());
+		}
+
+		if (U.notEmpty(cookies)) {
+			req.addHeader("Cookie", joinCookiesAsHeader(cookies));
 		}
 
 		if (config.verb() == HttpVerb.POST || config.verb() == HttpVerb.PUT || config.verb() == HttpVerb.PATCH) {
@@ -146,12 +152,30 @@ public class HttpClientUtil extends RapidoidThing {
 		return req;
 	}
 
+	private static String joinCookiesAsHeader(Map<String, String> cookies) {
+		StringBuilder allCookies = new StringBuilder();
+
+		for (Iterator<Map.Entry<String, String>> it = cookies.entrySet().iterator(); it.hasNext(); ) {
+			Map.Entry<String, String> e = it.next();
+
+			allCookies.append(e.getKey());
+			allCookies.append("=");
+			allCookies.append(e.getValue());
+
+			if (it.hasNext()) {
+				allCookies.append("; ");
+			}
+		}
+
+		return allCookies.toString();
+	}
+
 	private static RequestConfig reqConfig(HttpReq config) {
 		return RequestConfig.custom()
-				.setSocketTimeout(config.socketTimeout())
-				.setConnectTimeout(config.connectTimeout())
-				.setConnectionRequestTimeout(config.connectionRequestTimeout())
-				.build();
+			.setSocketTimeout(config.socketTimeout())
+			.setConnectTimeout(config.connectTimeout())
+			.setConnectionRequestTimeout(config.connectionRequestTimeout())
+			.build();
 	}
 
 	private static NByteArrayEntity paramsBody(Map<String, Object> data, Map<String, List<Upload>> files) {

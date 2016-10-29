@@ -22,18 +22,27 @@ package org.rapidoid.setup;
 
 import org.rapidoid.RapidoidThing;
 import org.rapidoid.annotation.*;
-import org.rapidoid.commons.Coll;
+import org.rapidoid.collection.Coll;
+import org.rapidoid.commons.Arr;
+import org.rapidoid.commons.Env;
 import org.rapidoid.config.Conf;
+import org.rapidoid.config.ConfigHelp;
 import org.rapidoid.data.JSON;
+import org.rapidoid.http.HttpVerb;
+import org.rapidoid.http.Req;
+import org.rapidoid.http.ReqRespHandler;
+import org.rapidoid.http.Resp;
 import org.rapidoid.io.Res;
 import org.rapidoid.ioc.IoC;
 import org.rapidoid.ioc.IoCContext;
+import org.rapidoid.job.Jobs;
 import org.rapidoid.lambda.Mapper;
-import org.rapidoid.lambda.NParamLambda;
 import org.rapidoid.log.Log;
 import org.rapidoid.render.Templates;
+import org.rapidoid.reverseproxy.Reverse;
 import org.rapidoid.scan.ClasspathUtil;
 import org.rapidoid.scan.Scan;
+import org.rapidoid.sql.JDBC;
 import org.rapidoid.u.U;
 import org.rapidoid.util.Msc;
 
@@ -56,6 +65,7 @@ public class App extends RapidoidThing {
 	private static volatile String appPkgName;
 	private static volatile boolean dirty;
 	private static volatile boolean restarted;
+	private static volatile boolean managed;
 
 	private static final Set<Class<?>> invoked = Coll.synchronizedSet();
 
@@ -65,13 +75,108 @@ public class App extends RapidoidThing {
 		@SuppressWarnings("unchecked")
 		@Override
 		public List<Class<?>> map(List<String> packages) throws Exception {
-			String[] pkgs = packages.toArray(new String[packages.size()]);
+			String[] pkgs = U.arrayOf(String.class, packages);
 			return Scan.annotated((Class<? extends Annotation>[]) ANNOTATIONS).in(pkgs).loadAll();
 		}
 	});
 
+	public static void args(String[] args, String... extraArgs) {
+		args(Arr.concat(extraArgs, args));
+	}
+
 	public static void args(String... args) {
-		Conf.args(args);
+		ConfigHelp.processHelp(args);
+
+		Env.setArgs(args);
+
+		AppVerification.selfVerify(args);
+	}
+
+	public static AppBootstrap bootstrap(String[] args, String... extraArgs) {
+		return bootstrap(Arr.concat(extraArgs, args));
+	}
+
+	public static AppBootstrap bootstrap(String... args) {
+		args(args);
+
+		if (!managed) scan();
+
+		return boot();
+	}
+
+	public static AppBootstrap run(String[] args, String... extraArgs) {
+		return run(Arr.concat(extraArgs, args));
+	}
+
+	public static AppBootstrap run(String... args) {
+		args(args);
+		// no implicit classpath scanning here
+
+		return boot();
+	}
+
+	private static AppBootstrap boot() {
+		Jobs.initialize();
+
+		bootstrapProxy();
+		bootstrapSqlRoutes();
+
+		AppBootstrap bootstrap = new AppBootstrap();
+		bootstrap.services();
+		return bootstrap;
+	}
+
+	private static void bootstrapProxy() {
+		if (!Conf.PROXY.isEmpty()) {
+			for (Map.Entry<String, Object> e : Conf.PROXY.toMap().entrySet()) {
+				String uri = e.getKey();
+				String upstream = (String) e.getValue();
+				Reverse.proxy().map(uri).to(upstream.split("\\s*\\,\\s*"));
+			}
+		}
+	}
+
+	private static void bootstrapSqlRoutes() {
+		if (!Conf.SQL.isEmpty()) {
+			for (Map.Entry<String, Object> e : Conf.SQL.toMap().entrySet()) {
+
+				String[] verbUri = e.getKey().trim().split("\\s+");
+
+				final HttpVerb verb;
+				String uri;
+
+				if (verbUri.length == 1) {
+					verb = HttpVerb.GET;
+					uri = verbUri[0];
+
+				} else if (verbUri.length == 2) {
+					verb = HttpVerb.from(verbUri[0]);
+					uri = verbUri[1];
+
+				} else {
+					throw U.rte("Invalid route!");
+				}
+
+				final String sql = (String) e.getValue();
+
+				On.route(verb.name(), uri).json(new ReqRespHandler() {
+					@Override
+					public Object execute(Req req, Resp resp) throws Exception {
+						if (verb == HttpVerb.GET) {
+							return JDBC.query(sql);
+						} else {
+							JDBC.execute(sql);
+							return U.map("success", true); // FIXME improve
+						}
+					}
+				});
+			}
+		}
+	}
+
+	public static void profiles(String... profiles) {
+		Env.setProfiles(profiles);
+		Conf.reset();
 	}
 
 	public static void path(String... path) {
@@ -81,8 +186,8 @@ public class App extends RapidoidThing {
 	public static synchronized String[] path() {
 		inferCallers();
 
-		if (U.isEmpty(App.path)) {
-			App.path = new String[]{appPkgName};
+		if (App.path == null) {
+			App.path = appPkgName != null ? U.array(appPkgName) : new String[0];
 		}
 
 		return path;
@@ -90,9 +195,8 @@ public class App extends RapidoidThing {
 
 	static void inferCallers() {
 		if (!restarted && appPkgName == null && mainClassName == null) {
-			String pkg = Msc.getCallingPackage();
 
-			appPkgName = pkg;
+			appPkgName = Msc.getCallingPackage();
 
 			if (mainClassName == null) {
 				Class<?> mainClass = Msc.getCallingMainClass();
@@ -100,13 +204,13 @@ public class App extends RapidoidThing {
 				mainClassName = mainClass != null ? mainClass.getName() : null;
 			}
 
-			if (mainClassName != null || pkg != null) {
-				Log.info("Inferring application root", "!main", mainClassName, "!package", pkg);
+			if (mainClassName != null || appPkgName != null) {
+				Log.info("Inferring application root", "!main", mainClassName, "!package", appPkgName);
 			}
 		}
 	}
 
-	private static void restartApp() {
+	private static synchronized void restartApp() {
 		if (!Msc.hasRapidoidWatch()) {
 			Log.warn("Cannot reload/restart the application, module rapidoid-watch is missing!");
 		}
@@ -131,7 +235,8 @@ public class App extends RapidoidThing {
 
 		App.path = null;
 
-		Conf.reload();
+		Conf.reset();
+		Env.reset();
 		Res.reset();
 		Templates.reset();
 		JSON.reset();
@@ -159,7 +264,7 @@ public class App extends RapidoidThing {
 			return;
 		}
 
-		Msc.invokeMain(entry, Conf.getArgs());
+		Msc.invokeMain(entry, U.arrayOf(String.class, Env.args()));
 
 		for (AppRestartListener listener : listeners) {
 			try {
@@ -176,6 +281,7 @@ public class App extends RapidoidThing {
 		mainClassName = null;
 		appPkgName = null;
 		restarted = false;
+		managed = false;
 		dirty = false;
 		path = null;
 		loader = App.class.getClassLoader();
@@ -183,6 +289,7 @@ public class App extends RapidoidThing {
 		AppBootstrap.reset();
 		beansCache.clear();
 		invoked.clear();
+		Reverse.reset();
 	}
 
 	public static void notifyChanges() {
@@ -208,44 +315,45 @@ public class App extends RapidoidThing {
 			packages = path();
 		}
 
-		return beansCache.get(U.list(packages));
+		List<String> pkgs = U.notEmpty(packages) ? U.list(packages) : U.<String>list();
+
+		return beansCache.get(pkgs);
 	}
 
 	public static boolean scan(String... packages) {
+
+		String appPath = Conf.APP.entry("path").str().getOrNull();
+		if (U.notEmpty(appPath)) {
+			App.path(appPath);
+		}
+
 		List<Class<?>> beans = App.findBeans(packages);
 		beans(beans.toArray());
 		return !beans.isEmpty();
 	}
 
 	public static void beans(Object... beans) {
-		for (Object bean : beans) {
-			U.notNull(bean, "bean");
-
-			if (bean instanceof NParamLambda) {
-				throw U.rte("Expected a bean, but found lambda: " + bean);
-			}
-		}
-
-		filterAndInvokeMainClasses(beans);
-
-		PojoHandlersSetup.from(Setup.ON, beans).register();
+		Setup.ON.beans(beans);
 	}
 
 	public static IoCContext context() {
 		return IoC.defaultContext();
 	}
 
-	public static AppBootstrap bootstrap(String... args) {
-		args(args);
-		scan();
-		return new AppBootstrap();
-	}
-
 	static void filterAndInvokeMainClasses(Object[] beans) {
+		managed(true);
 		Msc.filterAndInvokeMainClasses(beans, invoked);
 	}
 
 	public static boolean isRestarted() {
 		return restarted;
+	}
+
+	public static boolean managed() {
+		return managed;
+	}
+
+	public static void managed(boolean managed) {
+		App.managed = managed;
 	}
 }
