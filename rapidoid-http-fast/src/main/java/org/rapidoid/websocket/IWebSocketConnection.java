@@ -1,5 +1,6 @@
 package org.rapidoid.websocket;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -14,8 +15,8 @@ public interface IWebSocketConnection {
     void onMessage(IReceiveMessage receiver);
     void onClose(IConnectionClose closer);
     void sendBytes(byte[] bytes);
-    Object session(String name);
-    Map<String, Object> session();
-    void session(String name, Object value);
+    Serializable session(String name);
+    Map<String, Serializable> session();
+    void session(String name, Serializable value);
     Long id();
 }

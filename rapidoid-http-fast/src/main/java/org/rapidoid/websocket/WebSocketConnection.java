@@ -5,6 +5,7 @@ import org.rapidoid.http.Req;
 import org.rapidoid.net.abstracts.Channel;
 import org.rapidoid.net.impl.RapidoidConnection;
 
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.util.*;
 
@@ -23,7 +24,7 @@ public class WebSocketConnection implements IWebSocketConnection {
     private IConnectionClose closer;
     private Req req;
     private List<IWebSocketExtension> extensions;
-    private Map<String, Object> session;
+    private Map<String, Serializable> session;
 
     public WebSocketConnection(WebSocketProtocol proto, RapidoidConnection connection, WebSocketHandler handler, Req req, List<IWebSocketExtension> exts){
         this.webSocketProtocol = proto;
@@ -36,7 +37,7 @@ public class WebSocketConnection implements IWebSocketConnection {
         for (IWebSocketExtension ext: exts) {
             this.extensions.add(ext.getExtension());
         }
-        session = new HashMap<String, Object>();
+        session = req.session();
     }
 
     public List<IWebSocketExtension> getExtensions() {
@@ -96,18 +97,23 @@ public class WebSocketConnection implements IWebSocketConnection {
     }
 
     @Override
-    public Object session(String name) {
+    public Serializable session(String name) {
         return session.get(name);
     }
 
     @Override
-    public Map<String, Object> session() {
+    public Map<String, Serializable> session() {
         return session;
     }
 
     @Override
-    public void session(String name, Object value) {
+    public void session(String name, Serializable value) {
         session.put(name, value);
+        try {
+            req.custom().sessionManager().saveSession(req, req.sessionId(), req.session());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
